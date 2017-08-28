@@ -1,0 +1,6 @@
+[package]
+authors = ["Nathan Musoke <nathan.musoke@gmail.com>"]
+name = "olm"
+version = "0.0.1"
+
+[dependencies]
