@@ -11,6 +11,9 @@ Relevant docs:
   - [Olm](https://git.matrix.org/git/olm/about/docs/olm.rst)
   - [Megolm](https://git.matrix.org/git/olm/about/docs/megolm.rst)
 
+  - [Unstable matrix spec](https://matrix.org/speculator/spec/drafts%2Fe2e/client_server/unstable.html#end-to-end-encryption)
+  - https://matrix.to/#/!wzHrsErnsyaqbpFiRQ:matrix.org/$1481746849447546UYXxY:matrix.org
+
 ## Warning
 
 __I am not a cryptographer.  Assume I know nothing about cryptography.
