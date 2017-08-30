@@ -4,3 +4,4 @@ name = "olm"
 version = "0.0.1"
 
 [dependencies]
+error-chain = "0.10.0"
