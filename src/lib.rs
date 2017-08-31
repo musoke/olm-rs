@@ -14,14 +14,14 @@ mod errors {
 
 pub use errors::*;
 
+extern crate ring;
+extern crate untrusted;
+extern crate rand;
 
-mod olm;
-mod megolm;
+
+pub mod olm;
+pub mod megolm;
 
 
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-    }
-}
+mod tests {}
