@@ -1,3 +1,4 @@
+use std::fmt;
 use ring;
 use ring::{agreement, signature, rand};
 use untrusted;
@@ -11,13 +12,22 @@ pub struct DeviceId {
     id: String,
 }
 
-/// ```
-/// let d = ::olm::olm::device::DeviceId::from("DEVID");
-/// ```
+impl fmt::Display for DeviceId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
 impl<S> From<S> for DeviceId
 where
     S: Into<String>,
 {
+    /// # Examples
+    ///
+    /// ```
+    /// let d = ::olm::olm::device::DeviceId::from("DEVID");
+    /// let s: String = d.to_string();
+    /// ```
     fn from(s: S) -> DeviceId {
         DeviceId { id: s.into() }
     }
