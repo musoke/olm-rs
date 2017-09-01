@@ -25,34 +25,43 @@ where
 
 enum SigningKeyPair {
     Ed25519(signature::Ed25519KeyPair),
-    Other,
+    // TODO non-exhaustive enum https://github.com/rust-lang/rust/issues/44109
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 enum SigningKey<'a> {
     Ed25519(untrusted::Input<'a>),
-    Other,
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 enum IdentKeyPair {
     // TODO: This should not be ephemeral; is a permanent key
     // see https://github.com/briansmith/ring/issues/331
     Curve25519(agreement::EphemeralPrivateKey),
-    Other,
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 enum IdentKey<'a> {
     Curve25519(untrusted::Input<'a>),
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 enum OneTimeKeyPair {
     // TODO: This should not be ephemeral if these are to survive shutdown of the app
     // see https://github.com/briansmith/ring/issues/331
     Curve25519(agreement::EphemeralPrivateKey),
-    Other,
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 enum OneTimeKey<'a> {
     Curve25519(untrusted::Input<'a>),
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: u8 = 5;
