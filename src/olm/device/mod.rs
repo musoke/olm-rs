@@ -69,7 +69,7 @@ enum OneTimeKey<'a> {
     #[doc(hidden)] __Nonexhaustive,
 }
 
-const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: u8 = 5;
+const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: usize = 5;
 
 pub struct LocalDevice {
     device_id: DeviceId,
@@ -116,7 +116,7 @@ impl<'a> LocalDevice {
         ident_key_pair.compute_public_key(ident_key)?;
 
         // Generate one time keys
-        let mut one_time_key_pairs = HashMap::new();
+        let mut one_time_key_pairs = HashMap::with_capacity(DEFAULT_NUM_ONE_TIME_KEY_PAIRS);
 
         for _ in 0..DEFAULT_NUM_ONE_TIME_KEY_PAIRS {
             let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)?;
