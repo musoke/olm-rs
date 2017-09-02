@@ -1,6 +1,6 @@
 use std::fmt;
 use ring;
-use ring::{agreement, signature, rand};
+use ring::{agreement, rand, signature};
 use untrusted;
 use std::collections::HashMap;
 use olm::errors::*;
@@ -36,42 +36,36 @@ where
 enum SigningKeyPair {
     Ed25519(signature::Ed25519KeyPair),
     // TODO non-exhaustive enum https://github.com/rust-lang/rust/issues/44109
-    #[doc(hidden)]
-    __Nonexhaustive,
+    #[doc(hidden)] __Nonexhaustive,
 }
 
 enum SigningKey<'a> {
     Ed25519(untrusted::Input<'a>),
-    #[doc(hidden)]
-    __Nonexhaustive,
+    #[doc(hidden)] __Nonexhaustive,
 }
 
 enum IdentKeyPair {
     // TODO: This should not be ephemeral; is a permanent key
     // see https://github.com/briansmith/ring/issues/331
     Curve25519(agreement::EphemeralPrivateKey),
-    #[doc(hidden)]
-    __Nonexhaustive,
+    #[doc(hidden)] __Nonexhaustive,
 }
 
 enum IdentKey<'a> {
     Curve25519(untrusted::Input<'a>),
-    #[doc(hidden)]
-    __Nonexhaustive,
+    #[doc(hidden)] __Nonexhaustive,
 }
 
 enum OneTimeKeyPair {
     // TODO: This should not be ephemeral if these are to survive shutdown of the app
     // see https://github.com/briansmith/ring/issues/331
     Curve25519(agreement::EphemeralPrivateKey),
-    #[doc(hidden)]
-    __Nonexhaustive,
+    #[doc(hidden)] __Nonexhaustive,
 }
 
 enum OneTimeKey<'a> {
     Curve25519(untrusted::Input<'a>),
-    #[doc(hidden)]
-    __Nonexhaustive,
+    #[doc(hidden)] __Nonexhaustive,
 }
 
 const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: u8 = 5;
@@ -107,9 +101,8 @@ impl<'a> LocalDevice {
         let rng = ring::rand::SystemRandom::new();
 
         // Generate a new signing key
-        let pkcs8_bytes = signature::Ed25519KeyPair::generate_pkcs8(&rng).chain_err(
-            || "Unable to generate signature key",
-        )?;
+        let pkcs8_bytes = signature::Ed25519KeyPair::generate_pkcs8(&rng)
+            .chain_err(|| "Unable to generate signature key")?;
         // TODO Normally the application would store the PKCS#8 file persistently. Later it would
         // read the PKCS#8 file from persistent storage to use it.
         let key_pair = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&pkcs8_bytes))?;
