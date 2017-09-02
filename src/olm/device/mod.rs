@@ -1,9 +1,10 @@
 use std::fmt;
 use ring;
-use ring::{agreement, rand, signature};
+use ring::{agreement, signature};
 use untrusted;
 use std::collections::HashMap;
 use olm::errors::*;
+use super::super::util;
 
 #[derive(Debug)]
 pub struct DeviceId {
@@ -39,7 +40,7 @@ enum SigningKeyPair {
     #[doc(hidden)] __Nonexhaustive,
 }
 
-enum SigningKey<'a> {
+pub enum SigningKey<'a> {
     Ed25519(untrusted::Input<'a>),
     #[doc(hidden)] __Nonexhaustive,
 }
@@ -72,8 +73,8 @@ const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: u8 = 5;
 
 pub struct LocalDevice {
     device_id: DeviceId,
-    keypair: SigningKeyPair,
-    ident_curve_pair: IdentKeyPair,
+    signing_key_pair: SigningKeyPair,
+    ident_key_pair: IdentKeyPair,
     one_time_key_pairs: HashMap<Vec<u8>, OneTimeKeyPair>,
 }
 
@@ -105,9 +106,16 @@ impl<'a> LocalDevice {
             .chain_err(|| "Unable to generate signature key")?;
         // TODO Normally the application would store the PKCS#8 file persistently. Later it would
         // read the PKCS#8 file from persistent storage to use it.
-        let key_pair = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&pkcs8_bytes))?;
+        let signing_key_pair =
+            signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&pkcs8_bytes))?;
 
-        let ident_curve_pair = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)?;
+        // Generate a new identity key
+        let ident_key_pair = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)?;
+        let mut ident_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
+        let ident_key = &mut ident_key[..ident_key_pair.public_key_len()];
+        ident_key_pair.compute_public_key(ident_key)?;
+
+        // Generate one time keys
         let mut one_time_key_pairs = HashMap::new();
 
         for _ in 0..DEFAULT_NUM_ONE_TIME_KEY_PAIRS {
@@ -121,8 +129,8 @@ impl<'a> LocalDevice {
 
         Ok(LocalDevice {
             device_id: device_id,
-            keypair: SigningKeyPair::Ed25519(key_pair),
-            ident_curve_pair: IdentKeyPair::Curve25519(ident_curve_pair),
+            signing_key_pair: SigningKeyPair::Ed25519(signing_key_pair),
+            ident_key_pair: IdentKeyPair::Curve25519(ident_key_pair),
             one_time_key_pairs: one_time_key_pairs,
         })
     }
@@ -137,20 +145,30 @@ impl<'a> LocalDevice {
     /// Save device config
     ///
     /// unimplemented
-    pub fn to_file(&self) {
+    pub fn to_file(&self) -> Result<()> {
         unimplemented!()
     }
 }
 
 pub struct RemoteDevice<'a> {
     device_id: DeviceId,
-    keypair: SigningKey<'a>,
+    signing_key: SigningKey<'a>,
     ident_curve_pair: IdentKey<'a>,
 }
 
 pub trait Device {
     /// Get device fingerprint
-    fn fingerprint(&self);
+    fn fingerprint(&self) -> SigningKey;
+
+    /// Get device fingerprint in base 64
+    ///
+    /// # Examples
+    /// ```
+    /// use olm::olm::device::Device;
+    /// let d = olm::olm::device::LocalDevice::init().unwrap();
+    /// d.fingerprint_base64();
+    /// ```
+    fn fingerprint_base64(&self) -> String;
 
     /// Get device ID
     ///
@@ -168,8 +186,17 @@ pub trait Device {
 
 impl Device for LocalDevice {
     /// Get device fingerprint
-    fn fingerprint(&self) {
+    fn fingerprint(&self) -> SigningKey {
         unimplemented!()
+    }
+
+    fn fingerprint_base64(&self) -> String {
+        let k = &self.signing_key_pair;
+        let f = match k {
+            &SigningKeyPair::Ed25519(ref a) => a,
+            _ => panic!(""),
+        };
+        util::encode_bin_to_base64(f.public_key_bytes())
     }
 
     fn get_device_id(&self) -> &DeviceId {
@@ -183,10 +210,18 @@ impl Device for LocalDevice {
 
 impl<'a> Device for RemoteDevice<'a> {
     /// Get device fingerprint
-    fn fingerprint(&self) {
+    fn fingerprint(&self) -> SigningKey {
         unimplemented!()
     }
 
+    fn fingerprint_base64(&self) -> String {
+        let k = &self.signing_key;
+        let f = match k {
+            &SigningKey::Ed25519(ref a) => a,
+            _ => panic!(""),
+        };
+        util::encode_bin_to_base64(f.as_slice_less_safe())
+    }
     /// Get device ID
     fn get_device_id(&self) -> &DeviceId {
         &self.device_id

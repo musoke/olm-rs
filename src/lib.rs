@@ -14,13 +14,15 @@ mod errors {
 
 pub use errors::*;
 
+extern crate base64;
+extern crate rand;
 extern crate ring;
 extern crate untrusted;
-extern crate rand;
 
 
 pub mod olm;
 pub mod megolm;
+mod util;
 
 
 #[cfg(test)]

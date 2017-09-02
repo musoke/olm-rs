@@ -4,6 +4,7 @@ name = "olm"
 version = "0.0.1"
 
 [dependencies]
+base64 = "0.6.0"
 error-chain = "0.10.0"
 rand = "0.3.16"
 ring = "0.12.0"
