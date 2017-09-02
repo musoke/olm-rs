@@ -153,6 +153,14 @@ pub trait Device {
     fn fingerprint(&self);
 
     /// Get device ID
+    ///
+    /// # Examples
+    // TODO use a fixed device and show that the ID is as expected
+    /// ```
+    /// use olm::olm::device::Device;
+    /// let d = olm::olm::device::LocalDevice::init().unwrap();
+    /// d.get_device_id();
+    /// ```
     fn get_device_id(&self) -> &DeviceId;
 
     fn ident_curve25519(&self);
@@ -164,9 +172,8 @@ impl Device for LocalDevice {
         unimplemented!()
     }
 
-    /// Get device ID
     fn get_device_id(&self) -> &DeviceId {
-        unimplemented!()
+        &self.device_id
     }
 
     fn ident_curve25519(&self) {
@@ -182,7 +189,7 @@ impl<'a> Device for RemoteDevice<'a> {
 
     /// Get device ID
     fn get_device_id(&self) -> &DeviceId {
-        unimplemented!()
+        &self.device_id
     }
 
     fn ident_curve25519(&self) {
