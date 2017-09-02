@@ -52,7 +52,7 @@ enum IdentKeyPair {
     #[doc(hidden)] __Nonexhaustive,
 }
 
-enum IdentKey<'a> {
+pub enum IdentKey<'a> {
     Curve25519(untrusted::Input<'a>),
     #[doc(hidden)] __Nonexhaustive,
 }
@@ -174,7 +174,7 @@ impl<'a> LocalDevice {
 pub struct RemoteDevice<'a> {
     device_id: DeviceId,
     signing_key: SigningKey<'a>,
-    ident_curve_pair: IdentKey<'a>,
+    ident_key: IdentKey<'a>,
 }
 
 pub trait Device {
@@ -202,7 +202,7 @@ pub trait Device {
     /// ```
     fn get_device_id(&self) -> &DeviceId;
 
-    fn ident_curve25519(&self);
+    fn get_ident_key(&self) -> &IdentKey;
 }
 
 impl Device for LocalDevice {
@@ -224,8 +224,23 @@ impl Device for LocalDevice {
         &self.device_id
     }
 
-    fn ident_curve25519(&self) {
-        unimplemented!()
+    fn get_ident_key(&self) -> &IdentKey {
+        unimplemented!();
+        // let mut o: &[u8];
+
+        // match &self.ident_key_pair {
+        //     &IdentKeyPair::Curve25519(ref k) => {
+        //         let private_key = k;
+        //         let mut public_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
+        //         let public_key = &mut public_key[..private_key.public_key_len()];
+        //         private_key.compute_public_key(public_key).unwrap();
+
+        //         o = public_key;
+        //     }
+        //     _ => panic!(),
+        // }
+
+        // &IdentKey::Curve25519(untrusted::Input::from(o))
     }
 }
 
@@ -248,7 +263,7 @@ impl<'a> Device for RemoteDevice<'a> {
         &self.device_id
     }
 
-    fn ident_curve25519(&self) {
-        unimplemented!()
+    fn get_ident_key(&self) -> &IdentKey {
+        &self.ident_key
     }
 }
