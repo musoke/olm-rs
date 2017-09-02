@@ -148,6 +148,27 @@ impl<'a> LocalDevice {
     pub fn to_file(&self) -> Result<()> {
         unimplemented!()
     }
+
+    /// Get one-time public keys
+    pub fn get_one_time_keys(&self) -> Vec<&Vec<u8>> {
+        let mut keys = Vec::new();
+        for k in self.one_time_key_pairs.keys() {
+            keys.push(k)
+        }
+        keys
+    }
+
+    /// Check if we have a one-time key
+    ///
+    /// # Examples
+    /// ```
+    /// let my_dev = olm::olm::device::LocalDevice::init().unwrap();
+    /// let keys = my_dev.get_one_time_keys();
+    /// assert!(my_dev.check_one_time_key(keys[2]));
+    /// ```
+    pub fn check_one_time_key(&self, k: &Vec<u8>) -> bool {
+        self.one_time_key_pairs.contains_key(k)
+    }
 }
 
 pub struct RemoteDevice<'a> {
