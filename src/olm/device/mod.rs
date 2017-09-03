@@ -215,7 +215,7 @@ impl Device for LocalDevice {
         let k = &self.signing_key_pair;
         let f = match k {
             &SigningKeyPair::Ed25519(ref a) => a,
-            _ => panic!(""),
+            _ => unreachable!(""),
         };
         util::encode_bin_to_base64(f.public_key_bytes())
     }
