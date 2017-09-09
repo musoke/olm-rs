@@ -10,6 +10,10 @@ mod errors {
             Olm(::olm::Error, ::olm::ErrorKind);
             Megolm(::megolm::Error, ::megolm::ErrorKind);
         }
+
+        foreign_links {
+            Base64DecodeError(::base64::DecodeError);
+        }
     }
 }
 

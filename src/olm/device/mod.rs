@@ -217,7 +217,7 @@ impl Device for LocalDevice {
             &SigningKeyPair::Ed25519(ref a) => a,
             _ => unreachable!(""),
         };
-        util::encode_bin_to_base64(f.public_key_bytes())
+        util::bin_to_base64(f.public_key_bytes())
     }
 
     fn get_device_id(&self) -> &DeviceId {
@@ -256,7 +256,7 @@ impl<'a> Device for RemoteDevice<'a> {
             &SigningKey::Ed25519(ref a) => a,
             _ => panic!(""),
         };
-        util::encode_bin_to_base64(f.as_slice_less_safe())
+        util::bin_to_base64(f.as_slice_less_safe())
     }
     /// Get device ID
     fn get_device_id(&self) -> &DeviceId {
