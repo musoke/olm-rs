@@ -61,20 +61,38 @@ impl SigningKey for Ed25519Pub {
     }
 }
 
-impl<S> From<S> for Ed25519Pub
+use std::convert::TryFrom;
+impl<S> TryFrom<S> for Ed25519Pub
 where
     S: Into<String>,
 {
+    type Error = Error;
+    /// Convert base64 encoded strings to public keys
+    ///
+    /// Can fail if base64 is malformed.  No checks are done that the resulting public key is
+    /// indeed a valid public key; this is done when verifying a signature.
+    ///
     /// # Examples
     ///
     /// ```
-    /// let _k = olm::olm::signing_key::Ed25519Pub::from("SogYyrkTldLz0BXP+GYWs0qaYacUI0RleEqNT8J3riQ");
+    /// #![feature(try_from)]
+    /// use std::convert::TryFrom;
+    ///
+    /// let a = olm::olm::signing_key::Ed25519Pub
+    ///         ::try_from("SogYyrkTldLz0BXP+GYWs0qaYacUI0RleEqNT8J3riQ");
+    /// assert!(a.is_ok());
+    ///
+    /// let b = olm::olm::signing_key::Ed25519Pub
+    ///         ::try_from("SogYyrkTldLz0BXP-GYWs0qaYacUI0RleEqNT8J3riQ");
+    /// assert!(b.is_err());
+    ///
     /// ```
-    fn from(s: S) -> Ed25519Pub {
-        // unimplemented!()
-        Ed25519Pub {
-            pub_key: util::base64_to_bin(&s.into()).unwrap(),
-        }
+    fn try_from(s: S) -> Result<Self> {
+        Ok(Ed25519Pub {
+            pub_key: util::base64_to_bin(&s.into())
+                .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
+                .chain_err(|| "failed to read public signing key")?,
+        })
     }
 }
 

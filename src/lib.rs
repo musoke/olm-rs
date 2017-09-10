@@ -1,3 +1,4 @@
+#![feature(try_from)]
 #![recursion_limit = "1024"]
 #[macro_use]
 extern crate error_chain;
@@ -9,10 +10,6 @@ mod errors {
         links {
             Olm(::olm::Error, ::olm::ErrorKind);
             Megolm(::megolm::Error, ::megolm::ErrorKind);
-        }
-
-        foreign_links {
-            Base64DecodeError(::base64::DecodeError);
         }
     }
 }

@@ -10,6 +10,9 @@ mod errors {
         foreign_links {
             RingUnspecified(::ring::error::Unspecified);
         }
+        errors {
+            Base64DecodeError
+        }
     }
 }
 
