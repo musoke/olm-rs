@@ -4,7 +4,6 @@ use ring::agreement;
 use untrusted;
 use std::collections::HashMap;
 use olm::errors::*;
-use util;
 use olm::signing_key;
 
 #[derive(Debug)]

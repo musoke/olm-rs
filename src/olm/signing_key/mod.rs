@@ -31,16 +31,11 @@ pub trait SigningKey {
 /// Trait exposing methods on a private/pub key key pair
 ///
 /// This should normally only be used in `olm::device` and `olm::ratchet`
-pub trait SigningKeyPair {
+///
+/// Require that the type also implements SigningKey so that can get public key.
+pub trait SigningKeyPair: SigningKey {
     fn sign(&self, msg: &[u8]) -> signature::Signature;
-    fn public_key(&self) -> untrusted::Input;
 }
-
-// impl SigningKey for SigningKeyPair {
-//     fn public_key(&self) -> untrusted::Input {
-//         self.public_key()
-//     }
-// }
 
 pub struct Ed25519Pub {
     pub_key: Vec<u8>,
@@ -142,12 +137,23 @@ impl Ed25519Pair {
     }
 }
 
+impl SigningKey for Ed25519Pair {
+    fn public_key(&self) -> untrusted::Input {
+        untrusted::Input::from(&self.pair.public_key_bytes())
+    }
+
+    fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<()> {
+        Ok(signature::verify(
+            &signature::ED25519,
+            self.public_key(),
+            untrusted::Input::from(msg),
+            untrusted::Input::from(sig),
+        )?)
+    }
+}
+
 impl SigningKeyPair for Ed25519Pair {
     fn sign(&self, msg: &[u8]) -> signature::Signature {
         self.pair.sign(msg)
-    }
-
-    fn public_key(&self) -> untrusted::Input {
-        untrusted::Input::from(&self.pair.public_key_bytes())
     }
 }
