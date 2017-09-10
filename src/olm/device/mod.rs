@@ -1,10 +1,11 @@
 use std::fmt;
 use ring;
-use ring::{agreement, signature};
+use ring::agreement;
 use untrusted;
 use std::collections::HashMap;
 use olm::errors::*;
-use super::super::util;
+use util;
+use olm::signing_key;
 
 #[derive(Debug)]
 pub struct DeviceId {
@@ -32,17 +33,6 @@ where
     fn from(s: S) -> DeviceId {
         DeviceId { id: s.into() }
     }
-}
-
-enum SigningKeyPair {
-    Ed25519(signature::Ed25519KeyPair),
-    // TODO non-exhaustive enum https://github.com/rust-lang/rust/issues/44109
-    #[doc(hidden)] __Nonexhaustive,
-}
-
-pub enum SigningKey<'a> {
-    Ed25519(untrusted::Input<'a>),
-    #[doc(hidden)] __Nonexhaustive,
 }
 
 enum IdentKeyPair {
@@ -73,7 +63,7 @@ const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: usize = 5;
 
 pub struct LocalDevice {
     device_id: DeviceId,
-    signing_key_pair: SigningKeyPair,
+    signing_key_pair: signing_key::Ed25519Pair,
     ident_key_pair: IdentKeyPair,
     one_time_key_pairs: HashMap<Vec<u8>, OneTimeKeyPair>,
 }
@@ -98,16 +88,7 @@ impl<'a> LocalDevice {
                 .collect::<String>(),
         );
 
-        // TODO share one rng in lib
         let rng = ring::rand::SystemRandom::new();
-
-        // Generate a new signing key
-        let pkcs8_bytes = signature::Ed25519KeyPair::generate_pkcs8(&rng)
-            .chain_err(|| "Unable to generate signature key")?;
-        // TODO Normally the application would store the PKCS#8 file persistently. Later it would
-        // read the PKCS#8 file from persistent storage to use it.
-        let signing_key_pair =
-            signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&pkcs8_bytes))?;
 
         // Generate a new identity key
         let ident_key_pair = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)?;
@@ -129,7 +110,7 @@ impl<'a> LocalDevice {
 
         Ok(LocalDevice {
             device_id: device_id,
-            signing_key_pair: SigningKeyPair::Ed25519(signing_key_pair),
+            signing_key_pair: signing_key::Ed25519Pair::generate()?,
             ident_key_pair: IdentKeyPair::Curve25519(ident_key_pair),
             one_time_key_pairs: one_time_key_pairs,
         })
@@ -173,13 +154,13 @@ impl<'a> LocalDevice {
 
 pub struct RemoteDevice<'a> {
     device_id: DeviceId,
-    signing_key: SigningKey<'a>,
+    signing_key: signing_key::Ed25519Pub,
     ident_key: IdentKey<'a>,
 }
 
 pub trait Device {
     /// Get device fingerprint
-    fn fingerprint(&self) -> SigningKey;
+    fn fingerprint(&self) -> Vec<u8>;
 
     /// Get device fingerprint in base 64
     ///
@@ -207,17 +188,12 @@ pub trait Device {
 
 impl Device for LocalDevice {
     /// Get device fingerprint
-    fn fingerprint(&self) -> SigningKey {
+    fn fingerprint(&self) -> Vec<u8> {
         unimplemented!()
     }
 
     fn fingerprint_base64(&self) -> String {
-        let k = &self.signing_key_pair;
-        let f = match k {
-            &SigningKeyPair::Ed25519(ref a) => a,
-            _ => unreachable!(""),
-        };
-        util::bin_to_base64(f.public_key_bytes())
+        unimplemented!()
     }
 
     fn get_device_id(&self) -> &DeviceId {
@@ -226,37 +202,17 @@ impl Device for LocalDevice {
 
     fn get_ident_key(&self) -> &IdentKey {
         unimplemented!();
-        // let mut o: &[u8];
-
-        // match &self.ident_key_pair {
-        //     &IdentKeyPair::Curve25519(ref k) => {
-        //         let private_key = k;
-        //         let mut public_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
-        //         let public_key = &mut public_key[..private_key.public_key_len()];
-        //         private_key.compute_public_key(public_key).unwrap();
-
-        //         o = public_key;
-        //     }
-        //     _ => panic!(),
-        // }
-
-        // &IdentKey::Curve25519(untrusted::Input::from(o))
     }
 }
 
 impl<'a> Device for RemoteDevice<'a> {
     /// Get device fingerprint
-    fn fingerprint(&self) -> SigningKey {
+    fn fingerprint(&self) -> Vec<u8> {
         unimplemented!()
     }
 
     fn fingerprint_base64(&self) -> String {
-        let k = &self.signing_key;
-        let f = match k {
-            &SigningKey::Ed25519(ref a) => a,
-            _ => panic!(""),
-        };
-        util::bin_to_base64(f.as_slice_less_safe())
+        unimplemented!()
     }
     /// Get device ID
     fn get_device_id(&self) -> &DeviceId {

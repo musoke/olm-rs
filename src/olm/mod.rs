@@ -16,3 +16,4 @@ mod errors {
 pub use self::errors::*;
 
 pub mod device;
+pub mod signing_key;
