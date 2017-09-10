@@ -5,7 +5,7 @@ use util;
 use olm::errors::*;
 
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
-// should "inherit" the IdentityKey and IdentityKeyPriv traits from the members.
+// should "inherit" the `IdentityKey` and `IdentityKeyPriv` traits from the members.
 
 // enum IdentityKeyTypes {
 //     Ed25519(Curve25519Pub),

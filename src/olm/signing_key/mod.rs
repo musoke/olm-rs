@@ -5,7 +5,7 @@ use util;
 use olm::errors::*;
 
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
-// should "inherit" the SigningKey and SigningKeyPair traits from the members.
+// should "inherit" the `SigningKey` and `SigningKeyPair` traits from the members.
 
 // enum SigningKeyTypes {
 //     Ed25519(Ed25519Pub),
@@ -143,7 +143,7 @@ impl Ed25519Pair {
 
 impl SigningKey for Ed25519Pair {
     fn public_key(&self) -> untrusted::Input {
-        untrusted::Input::from(&self.pair.public_key_bytes())
+        untrusted::Input::from(self.pair.public_key_bytes())
     }
 
     fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<()> {
