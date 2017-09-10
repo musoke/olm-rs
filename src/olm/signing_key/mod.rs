@@ -7,6 +7,10 @@ use olm::errors::*;
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
 // should "inherit" the SigningKey and SigningKeyPair traits from the members.
 
+// enum SigningKeyTypes {
+//     Ed25519(Ed25519Pub),
+//     #[doc(hidden)] __Nonexhaustive,
+// }
 
 /// Trait exposing methods on a public key
 ///

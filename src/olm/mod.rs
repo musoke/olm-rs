@@ -20,3 +20,4 @@ pub use self::errors::*;
 
 pub mod device;
 pub mod signing_key;
+pub mod identity_key;

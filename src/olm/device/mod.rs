@@ -4,7 +4,7 @@ use ring::agreement;
 use untrusted;
 use std::collections::HashMap;
 use olm::errors::*;
-use olm::signing_key;
+use olm::{identity_key, signing_key};
 
 #[derive(Debug)]
 pub struct DeviceId {
@@ -34,18 +34,6 @@ where
     }
 }
 
-enum IdentKeyPair {
-    // TODO: This should not be ephemeral; is a permanent key
-    // see https://github.com/briansmith/ring/issues/331
-    Curve25519(agreement::EphemeralPrivateKey),
-    #[doc(hidden)] __Nonexhaustive,
-}
-
-pub enum IdentKey<'a> {
-    Curve25519(untrusted::Input<'a>),
-    #[doc(hidden)] __Nonexhaustive,
-}
-
 enum OneTimeKeyPair {
     // TODO: This should not be ephemeral if these are to survive shutdown of the app
     // see https://github.com/briansmith/ring/issues/331
@@ -63,7 +51,7 @@ const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: usize = 5;
 pub struct LocalDevice {
     device_id: DeviceId,
     signing_key_pair: signing_key::Ed25519Pair,
-    ident_key_pair: IdentKeyPair,
+    ident_key_priv: identity_key::Curve25519Priv,
     one_time_key_pairs: HashMap<Vec<u8>, OneTimeKeyPair>,
 }
 
@@ -89,12 +77,6 @@ impl<'a> LocalDevice {
 
         let rng = ring::rand::SystemRandom::new();
 
-        // Generate a new identity key
-        let ident_key_pair = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)?;
-        let mut ident_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
-        let ident_key = &mut ident_key[..ident_key_pair.public_key_len()];
-        ident_key_pair.compute_public_key(ident_key)?;
-
         // Generate one time keys
         let mut one_time_key_pairs = HashMap::with_capacity(DEFAULT_NUM_ONE_TIME_KEY_PAIRS);
 
@@ -110,7 +92,7 @@ impl<'a> LocalDevice {
         Ok(LocalDevice {
             device_id: device_id,
             signing_key_pair: signing_key::Ed25519Pair::generate()?,
-            ident_key_pair: IdentKeyPair::Curve25519(ident_key_pair),
+            ident_key_priv: identity_key::Curve25519Priv::generate()?,
             one_time_key_pairs: one_time_key_pairs,
         })
     }
@@ -151,10 +133,10 @@ impl<'a> LocalDevice {
     }
 }
 
-pub struct RemoteDevice<'a> {
+pub struct RemoteDevice {
     device_id: DeviceId,
     signing_key: signing_key::Ed25519Pub,
-    ident_key: IdentKey<'a>,
+    ident_key: identity_key::Curve25519Pub,
 }
 
 pub trait Device {
@@ -182,7 +164,7 @@ pub trait Device {
     /// ```
     fn get_device_id(&self) -> &DeviceId;
 
-    fn get_ident_key(&self) -> &IdentKey;
+    fn get_ident_key(&self) -> &identity_key::Curve25519Pub;
 }
 
 impl Device for LocalDevice {
@@ -199,12 +181,12 @@ impl Device for LocalDevice {
         &self.device_id
     }
 
-    fn get_ident_key(&self) -> &IdentKey {
+    fn get_ident_key(&self) -> &identity_key::Curve25519Pub {
         unimplemented!();
     }
 }
 
-impl<'a> Device for RemoteDevice<'a> {
+impl Device for RemoteDevice {
     /// Get device fingerprint
     fn fingerprint(&self) -> Vec<u8> {
         unimplemented!()
@@ -218,7 +200,7 @@ impl<'a> Device for RemoteDevice<'a> {
         &self.device_id
     }
 
-    fn get_ident_key(&self) -> &IdentKey {
+    fn get_ident_key(&self) -> &identity_key::Curve25519Pub {
         &self.ident_key
     }
 }
