@@ -96,6 +96,16 @@ where
     }
 }
 
+impl From<Vec<u8>> for Ed25519Pub {
+    /// Create public Ed25519 from bytes
+    ///
+    /// This is unchecked until the public key is used to verify a signature
+    ///
+    fn from(v: Vec<u8>) -> Ed25519Pub {
+        Ed25519Pub { pub_key: v }
+    }
+}
+
 pub struct Ed25519Pair {
     pair: signature::Ed25519KeyPair,
 }
