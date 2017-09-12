@@ -106,6 +106,7 @@ impl From<Vec<u8>> for Ed25519Pub {
 }
 
 pub struct Ed25519Pair {
+    pkcs8: Option<[u8; 85]>,
     pair: signature::Ed25519KeyPair,
 }
 
@@ -126,6 +127,7 @@ impl Ed25519Pair {
             signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&pkcs8_bytes))?;
 
         Ok(Ed25519Pair {
+            pkcs8: Some(pkcs8_bytes),
             pair: signing_key_pair,
         })
     }
@@ -134,10 +136,22 @@ impl Ed25519Pair {
     ///
     /// Should only be exposed via `LocalDevice::new()`?
     pub fn from_pkcs8(input: untrusted::Input) -> Result<Self> {
+        let mut pkcs8 = [0u8; 85];
+        pkcs8.clone_from_slice(input.as_slice_less_safe());
+
         Ok(Ed25519Pair {
+            pkcs8: Some(pkcs8),
             pair: signature::Ed25519KeyPair::from_pkcs8(input)
                 .chain_err(|| "Failed to load private key")?,
         })
+    }
+
+    pub fn try_to_pkcs8_bytes(&self) -> Result<&[u8]>
+    {
+        match self.pkcs8 {
+            Some(ref a) => Ok(a),
+            _ => Err(Error::from("could not export private signing key")),
+        }
     }
 }
 
