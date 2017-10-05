@@ -1,10 +1,6 @@
 use std::fmt;
-use ring;
-use ring::agreement;
-use untrusted;
-use std::collections::HashMap;
 use olm::errors::*;
-use olm::{identity_key, signing_key};
+use olm::{identity_key, one_time_key, signing_key};
 
 #[derive(Debug)]
 pub struct DeviceId {
@@ -34,25 +30,11 @@ where
     }
 }
 
-enum OneTimeKeyPair {
-    // TODO: This should not be ephemeral if these are to survive shutdown of the app
-    // see https://github.com/briansmith/ring/issues/331
-    Curve25519(agreement::EphemeralPrivateKey),
-    #[doc(hidden)] __Nonexhaustive,
-}
-
-enum OneTimeKey<'a> {
-    Curve25519(untrusted::Input<'a>),
-    #[doc(hidden)] __Nonexhaustive,
-}
-
-const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: usize = 5;
-
 pub struct LocalDevice {
     device_id: DeviceId,
     signing_key_pair: signing_key::Ed25519Pair,
     ident_key_priv: identity_key::Curve25519Priv,
-    one_time_key_pairs: HashMap<Vec<u8>, OneTimeKeyPair>,
+    one_time_key_pairs: one_time_key::Store,
 }
 
 impl<'a> LocalDevice {
@@ -75,29 +57,17 @@ impl<'a> LocalDevice {
                 .collect::<String>(),
         );
 
-        let rng = ring::rand::SystemRandom::new();
-
-        // Generate one time keys
-        let mut one_time_key_pairs = HashMap::with_capacity(DEFAULT_NUM_ONE_TIME_KEY_PAIRS);
-
-        for _ in 0..DEFAULT_NUM_ONE_TIME_KEY_PAIRS {
-            let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)?;
-            let mut public_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
-            let public_key = &mut public_key[..private_key.public_key_len()];
-            private_key.compute_public_key(public_key)?;
-
-            one_time_key_pairs.insert(public_key.to_vec(), OneTimeKeyPair::Curve25519(private_key));
-        }
-
         Ok(LocalDevice {
             device_id: device_id,
             signing_key_pair: signing_key::Ed25519Pair::generate()?,
             ident_key_priv: identity_key::Curve25519Priv::generate()?,
-            one_time_key_pairs: one_time_key_pairs,
+            one_time_key_pairs: one_time_key::Store::generate()?,
         })
     }
 
     /// Load device config from file
+    ///
+    /// unimplemented
     ///
     /// Needs forthcoming updates to ring; see https://github.com/briansmith/ring/issues/331
     pub fn from_file() -> Result<Self> {
@@ -107,28 +77,26 @@ impl<'a> LocalDevice {
     /// Save device config
     ///
     /// unimplemented
+    ///
+    /// Needs forthcoming updates to ring; see https://github.com/briansmith/ring/issues/331
     pub fn to_file(&self) -> Result<()> {
         unimplemented!()
     }
 
     /// Get one-time public keys
-    pub fn get_one_time_keys(&self) -> Vec<&Vec<u8>> {
-        let mut keys = Vec::new();
-        for k in self.one_time_key_pairs.keys() {
-            keys.push(k)
-        }
-        keys
+    pub fn get_one_time_keys(&self) -> Vec<&one_time_key::Curve25519Pub> {
+        self.one_time_key_pairs.get_keys()
     }
 
     /// Check if we have a one-time key
-    ///
+
     /// # Examples
     /// ```
     /// let my_dev = olm::olm::device::LocalDevice::init().unwrap();
     /// let keys = my_dev.get_one_time_keys();
-    /// assert!(my_dev.check_one_time_key(keys[2]));
+    /// assert!(my_dev.contains(keys[2]));
     /// ```
-    pub fn check_one_time_key(&self, k: &Vec<u8>) -> bool {
+    pub fn contains(&self, k: &one_time_key::Curve25519Pub) -> bool {
         self.one_time_key_pairs.contains_key(k)
     }
 }
@@ -149,7 +117,7 @@ pub trait Device {
     /// ```
     /// use olm::olm::device::Device;
     /// let d = olm::olm::device::LocalDevice::init().unwrap();
-    /// d.fingerprint_base64();
+    // /// d.fingerprint_base64();
     /// ```
     fn fingerprint_base64(&self) -> String;
 
