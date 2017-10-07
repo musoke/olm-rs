@@ -33,7 +33,7 @@ pub trait OneTimeKey {
 ///
 /// This should normally only be used in `olm::device` and `olm::ratchet`
 ///
-/// Require that the type also implements IdentityKey so that one can get the public key.
+/// Require that the type also implements `OneTimeKey` so that one can get the public key.
 pub trait OneTimeKeyPriv: OneTimeKey {
     // TODO: This should not be ephemeral; need updates to ring.  Then can pass a reference to
     // self instead of consuming.

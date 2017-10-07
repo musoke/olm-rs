@@ -36,7 +36,7 @@ pub trait SigningKey {
 ///
 /// This should normally only be used in `olm::device` and `olm::ratchet`
 ///
-/// Require that the type also implements SigningKey so that can get public key.
+/// Require that the type also implements `SigningKey` so that can get public key.
 pub trait SigningKeyPair: SigningKey {
     fn sign(&self, msg: &[u8]) -> signature::Signature;
 }
@@ -146,8 +146,7 @@ impl Ed25519Pair {
         })
     }
 
-    pub fn try_to_pkcs8_bytes(&self) -> Result<&[u8]>
-    {
+    pub fn try_to_pkcs8_bytes(&self) -> Result<&[u8]> {
         match self.pkcs8 {
             Some(ref a) => Ok(a),
             _ => Err(Error::from("could not export private signing key")),
