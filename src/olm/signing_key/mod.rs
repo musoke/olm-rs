@@ -23,6 +23,7 @@ pub trait SigningKey {
     /// # Examples
     /// ```
     /// ```
+    // TODO: is this method appropriate here? Or just expose the same functionality at the device level
     fn public_key_base64(&self) -> String {
         util::bin_to_base64(self.public_key().as_slice_less_safe())
     }
@@ -90,7 +91,7 @@ where
         Ok(Ed25519Pub {
             pub_key: util::base64_to_bin(&s.into())
                 .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
-                .chain_err(|| "failed to read public signing key")?,
+                .chain_err(|| "failed to decode public signing key")?,
         })
     }
 }

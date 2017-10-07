@@ -1,6 +1,9 @@
 use std::fmt;
+use untrusted;
+use util;
 use olm::errors::*;
 use olm::{identity_key, one_time_key, signing_key};
+use olm::signing_key::SigningKey;
 
 #[derive(Debug)]
 pub struct DeviceId {
@@ -109,7 +112,7 @@ pub struct RemoteDevice {
 
 pub trait Device {
     /// Get device fingerprint
-    fn fingerprint(&self) -> Vec<u8>;
+    fn fingerprint(&self) -> untrusted::Input;
 
     /// Get device fingerprint in base 64
     ///
@@ -117,7 +120,7 @@ pub trait Device {
     /// ```
     /// use olm::olm::device::Device;
     /// let d = olm::olm::device::LocalDevice::init().unwrap();
-    // /// d.fingerprint_base64();
+    /// d.fingerprint_base64();
     /// ```
     fn fingerprint_base64(&self) -> String;
 
@@ -137,12 +140,12 @@ pub trait Device {
 
 impl Device for LocalDevice {
     /// Get device fingerprint
-    fn fingerprint(&self) -> Vec<u8> {
-        unimplemented!()
+    fn fingerprint(&self) -> untrusted::Input {
+        self.signing_key_pair.public_key()
     }
 
     fn fingerprint_base64(&self) -> String {
-        unimplemented!()
+        util::bin_to_base64(self.fingerprint().as_slice_less_safe())
     }
 
     fn get_device_id(&self) -> &DeviceId {
@@ -156,12 +159,12 @@ impl Device for LocalDevice {
 
 impl Device for RemoteDevice {
     /// Get device fingerprint
-    fn fingerprint(&self) -> Vec<u8> {
-        unimplemented!()
+    fn fingerprint(&self) -> untrusted::Input {
+        self.signing_key.public_key()
     }
 
     fn fingerprint_base64(&self) -> String {
-        unimplemented!()
+        util::bin_to_base64(self.fingerprint().as_slice_less_safe())
     }
     /// Get device ID
     fn get_device_id(&self) -> &DeviceId {
