@@ -2,7 +2,7 @@ use std::fmt;
 use untrusted;
 use util;
 use olm::errors::*;
-use olm::{identity_key, one_time_key, signing_key};
+use olm::{identity_key, one_time_key, ratchet, signing_key};
 use olm::signing_key::SigningKey;
 
 #[derive(Debug)]
@@ -38,6 +38,7 @@ pub struct LocalDevice {
     signing_key_pair: signing_key::Ed25519Pair,
     ident_key_priv: identity_key::Curve25519Priv,
     one_time_key_pairs: one_time_key::Store,
+    ratchets: ratchet::Store,
 }
 
 impl<'a> LocalDevice {
@@ -65,6 +66,7 @@ impl<'a> LocalDevice {
             signing_key_pair: signing_key::Ed25519Pair::generate()?,
             ident_key_priv: identity_key::Curve25519Priv::generate()?,
             one_time_key_pairs: one_time_key::Store::generate()?,
+            ratchets: ratchet::Store::new(),
         })
     }
 
