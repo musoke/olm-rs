@@ -51,6 +51,22 @@ impl Ratchet {
         ident_bob: identity_key::Curve25519Priv,
         one_time_bob: one_time_key::Curve25519Priv,
     ) -> Result<Self> {
+        let secret = Ratchet::x3dh(ident_alice, one_time_alice, ident_bob, one_time_bob)?;
+        let (root, chain) = secret.split_at(256);
+
+        Ok(Ratchet {
+            id: RatchetId {},
+            graph: (),
+        })
+    }
+
+    fn x3dh(
+        ident_alice: &identity_key::Curve25519Pub,
+        one_time_alice: one_time_key::Curve25519Pub,
+        // TODO: ident_bob should not be consumed once it is non-ephemeral
+        ident_bob: identity_key::Curve25519Priv,
+        one_time_bob: one_time_key::Curve25519Priv,
+    ) -> Result<[u8; 512]> {
         // TODO: change once non-ephemeral keys are available
         let (one_time_bob_1, one_time_bob_2) = one_time_bob.private_key();
 
@@ -90,12 +106,7 @@ impl Ratchet {
         let mut secret: [u8; 512] = [0; 512];
         hkdf::extract_and_expand(initial_salt, &s, "OLM_ROOT".as_bytes(), &mut secret);
 
-        let (root, chain) = secret.split_at(256);
-
-        Ok(Ratchet {
-            id: RatchetId {},
-            graph: (),
-        })
+        Ok(secret)
     }
 
     pub fn import() -> Self {
