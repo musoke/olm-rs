@@ -37,12 +37,7 @@ pub trait OneTimeKey {
 pub trait OneTimeKeyPriv: OneTimeKey {
     // TODO: This should not be ephemeral; need updates to ring.  Then can pass a reference to
     // self instead of consuming.
-    fn private_key(
-        self,
-    ) -> (
-        agreement::EphemeralPrivateKey,
-        agreement::EphemeralPrivateKey,
-    );
+    fn private_key(self) -> (agreement::EphemeralPrivateKey, agreement::EphemeralPrivateKey);
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -62,40 +57,40 @@ impl Into<Vec<u8>> for Curve25519Pub {
     }
 }
 
-use std::convert::TryFrom;
-impl<S> TryFrom<S> for Curve25519Pub
-where
-    S: Into<String>,
-{
-    type Error = Error;
-    /// Convert base64 encoded strings to public keys
-    ///
-    /// Can fail if base64 is malformed.  No checks are done that the resulting public key is
-    /// indeed a valid public key.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// #![feature(try_from)]
-    /// use std::convert::TryFrom;
-    ///
-    /// let a = olm::olm::one_time_key::Curve25519Pub
-    ///         ::try_from("JGLn/yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
-    /// assert!(a.is_ok());
-    ///
-    /// let b = olm::olm::one_time_key::Curve25519Pub
-    ///         ::try_from("JGLn_yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
-    /// assert!(b.is_err());
-    ///
-    /// ```
-    fn try_from(s: S) -> Result<Self> {
-        Ok(Curve25519Pub {
-            pub_key: util::base64_to_bin(&s.into())
-                .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
-                .chain_err(|| "failed to read public identity key")?,
-        })
-    }
-}
+// use std::convert::TryFrom;
+// impl<S> TryFrom<S> for Curve25519Pub
+// where
+//     S: Into<String>,
+// {
+//     type Error = Error;
+//     /// Convert base64 encoded strings to public keys
+//     ///
+//     /// Can fail if base64 is malformed.  No checks are done that the resulting public key is
+//     /// indeed a valid public key.
+//     ///
+//     /// # Examples
+//     ///
+//     /// ```
+//     /// #![feature(try_from)]
+//     /// use std::convert::TryFrom;
+//     ///
+//     /// let a = olm::olm::one_time_key::Curve25519Pub
+//     ///         ::try_from("JGLn/yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
+//     /// assert!(a.is_ok());
+//     ///
+//     /// let b = olm::olm::one_time_key::Curve25519Pub
+//     ///         ::try_from("JGLn_yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
+//     /// assert!(b.is_err());
+//     ///
+//     /// ```
+//     fn try_from(s: S) -> Result<Self> {
+//         Ok(Curve25519Pub {
+//             pub_key: util::base64_to_bin(&s.into())
+//                 .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
+//                 .chain_err(|| "failed to read public identity key")?,
+//         })
+//     }
+// }
 
 impl From<Vec<u8>> for Curve25519Pub {
     /// Create public Curve25519 key from bytes
@@ -116,10 +111,7 @@ impl From<Vec<u8>> for Curve25519Pub {
 /// copies in a tuple.  They are identical because for now they aren't even random.  Hopefully this
 /// will be fixable in the near future.
 pub struct Curve25519Priv {
-    private_key: (
-        agreement::EphemeralPrivateKey,
-        agreement::EphemeralPrivateKey,
-    ),
+    private_key: (agreement::EphemeralPrivateKey, agreement::EphemeralPrivateKey),
     public_key: Vec<u8>,
 }
 
@@ -145,14 +137,14 @@ impl Curve25519Priv {
         // Calculate corresponding public key
         let mut public_key_1 = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
         let public_key_1 = &mut public_key_1[..private_key_1.public_key_len()];
-        private_key_1
-            .compute_public_key(public_key_1)
-            .expect("can get public key from generated private key");
+        private_key_1.compute_public_key(public_key_1).expect(
+            "can get public key from generated private key",
+        );
         let mut public_key_2 = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
         let public_key_2 = &mut public_key_2[..private_key_2.public_key_len()];
-        private_key_2
-            .compute_public_key(public_key_2)
-            .expect("can get public key from generated private key");
+        private_key_2.compute_public_key(public_key_2).expect(
+            "can get public key from generated private key",
+        );
 
         Ok((
             Curve25519Pub::from(Vec::from(public_key_1)),
@@ -181,12 +173,7 @@ impl OneTimeKey for Curve25519Priv {
 }
 
 impl OneTimeKeyPriv for Curve25519Priv {
-    fn private_key(
-        self,
-    ) -> (
-        agreement::EphemeralPrivateKey,
-        agreement::EphemeralPrivateKey,
-    ) {
+    fn private_key(self) -> (agreement::EphemeralPrivateKey, agreement::EphemeralPrivateKey) {
         self.private_key
     }
 }
@@ -205,9 +192,7 @@ impl Store {
     /// let s = olm::olm::one_time_key::Store::generate().expect("Can generate onetime key store");
     /// ```
     pub fn generate() -> Result<Self> {
-        let mut store = Store {
-            hashmap: HashMap::with_capacity(DEFAULT_NUM_ONE_TIME_KEY_PAIRS),
-        };
+        let mut store = Store { hashmap: HashMap::with_capacity(DEFAULT_NUM_ONE_TIME_KEY_PAIRS) };
 
         for i in 0..DEFAULT_NUM_ONE_TIME_KEY_PAIRS {
             // TODO generate an actual random key

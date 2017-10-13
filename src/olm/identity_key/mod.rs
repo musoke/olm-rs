@@ -49,40 +49,40 @@ impl IdentityKey for Curve25519Pub {
     }
 }
 
-use std::convert::TryFrom;
-impl<S> TryFrom<S> for Curve25519Pub
-where
-    S: Into<String>,
-{
-    type Error = Error;
-    /// Convert base64 encoded strings to public keys
-    ///
-    /// Can fail if base64 is malformed.  No checks are done that the resulting public key is
-    /// indeed a valid public key.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// #![feature(try_from)]
-    /// use std::convert::TryFrom;
-    ///
-    /// let a = olm::olm::identity_key::Curve25519Pub
-    ///         ::try_from("JGLn/yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
-    /// assert!(a.is_ok());
-    ///
-    /// let b = olm::olm::identity_key::Curve25519Pub
-    ///         ::try_from("JGLn_yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
-    /// assert!(b.is_err());
-    ///
-    /// ```
-    fn try_from(s: S) -> Result<Self> {
-        Ok(Curve25519Pub {
-            pub_key: util::base64_to_bin(&s.into())
-                .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
-                .chain_err(|| "failed to read public identity key")?,
-        })
-    }
-}
+// use std::convert::TryFrom;
+// impl<S> TryFrom<S> for Curve25519Pub
+// where
+//     S: Into<String>,
+// {
+//     type Error = Error;
+//     /// Convert base64 encoded strings to public keys
+//     ///
+//     /// Can fail if base64 is malformed.  No checks are done that the resulting public key is
+//     /// indeed a valid public key.
+//     ///
+//     /// # Examples
+//     ///
+//     /// ```
+//     /// #![feature(try_from)]
+//     /// use std::convert::TryFrom;
+//     ///
+//     /// let a = olm::olm::identity_key::Curve25519Pub
+//     ///         ::try_from("JGLn/yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
+//     /// assert!(a.is_ok());
+//     ///
+//     /// let b = olm::olm::identity_key::Curve25519Pub
+//     ///         ::try_from("JGLn_yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
+//     /// assert!(b.is_err());
+//     ///
+//     /// ```
+//     fn try_from(s: S) -> Result<Self> {
+//         Ok(Curve25519Pub {
+//             pub_key: util::base64_to_bin(&s.into())
+//                 .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
+//                 .chain_err(|| "failed to read public identity key")?,
+//         })
+//     }
+// }
 
 impl From<Vec<u8>> for Curve25519Pub {
     /// Create public Curve25519 key from bytes
@@ -118,9 +118,9 @@ impl Curve25519Priv {
         // Calculate corresponding public key
         let mut public_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
         let public_key = &mut public_key[..private_key.public_key_len()];
-        private_key
-            .compute_public_key(public_key)
-            .expect("can get public key from generated private key");
+        private_key.compute_public_key(public_key).expect(
+            "can get public key from generated private key",
+        );
 
         Ok(Curve25519Priv {
             private_key: private_key,

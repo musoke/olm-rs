@@ -61,40 +61,40 @@ impl SigningKey for Ed25519Pub {
     }
 }
 
-use std::convert::TryFrom;
-impl<S> TryFrom<S> for Ed25519Pub
-where
-    S: Into<String>,
-{
-    type Error = Error;
-    /// Convert base64 encoded strings to public keys
-    ///
-    /// Can fail if base64 is malformed.  No checks are done that the resulting public key is
-    /// indeed a valid public key; this is done when verifying a signature.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// #![feature(try_from)]
-    /// use std::convert::TryFrom;
-    ///
-    /// let a = olm::olm::signing_key::Ed25519Pub
-    ///         ::try_from("SogYyrkTldLz0BXP+GYWs0qaYacUI0RleEqNT8J3riQ");
-    /// assert!(a.is_ok());
-    ///
-    /// let b = olm::olm::signing_key::Ed25519Pub
-    ///         ::try_from("SogYyrkTldLz0BXP-GYWs0qaYacUI0RleEqNT8J3riQ");
-    /// assert!(b.is_err());
-    ///
-    /// ```
-    fn try_from(s: S) -> Result<Self> {
-        Ok(Ed25519Pub {
-            pub_key: util::base64_to_bin(&s.into())
-                .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
-                .chain_err(|| "failed to decode public signing key")?,
-        })
-    }
-}
+// use std::convert::TryFrom;
+// impl<S> TryFrom<S> for Ed25519Pub
+// where
+//     S: Into<String>,
+// {
+//     type Error = Error;
+//     /// Convert base64 encoded strings to public keys
+//     ///
+//     /// Can fail if base64 is malformed.  No checks are done that the resulting public key is
+//     /// indeed a valid public key; this is done when verifying a signature.
+//     ///
+//     /// # Examples
+//     ///
+//     /// ```
+//     /// #![feature(try_from)]
+//     /// use std::convert::TryFrom;
+//     ///
+//     /// let a = olm::olm::signing_key::Ed25519Pub
+//     ///         ::try_from("SogYyrkTldLz0BXP+GYWs0qaYacUI0RleEqNT8J3riQ");
+//     /// assert!(a.is_ok());
+//     ///
+//     /// let b = olm::olm::signing_key::Ed25519Pub
+//     ///         ::try_from("SogYyrkTldLz0BXP-GYWs0qaYacUI0RleEqNT8J3riQ");
+//     /// assert!(b.is_err());
+//     ///
+//     /// ```
+//     fn try_from(s: S) -> Result<Self> {
+//         Ok(Ed25519Pub {
+//             pub_key: util::base64_to_bin(&s.into())
+//                 .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
+//                 .chain_err(|| "failed to decode public signing key")?,
+//         })
+//     }
+// }
 
 impl From<Vec<u8>> for Ed25519Pub {
     /// Create public Ed25519 from bytes
@@ -120,8 +120,9 @@ impl Ed25519Pair {
         let rng = ring::rand::SystemRandom::new();
 
         // Generate a new signing key
-        let pkcs8_bytes = signature::Ed25519KeyPair::generate_pkcs8(&rng)
-            .chain_err(|| "Unable to generate signature key")?;
+        let pkcs8_bytes = signature::Ed25519KeyPair::generate_pkcs8(&rng).chain_err(
+            || "Unable to generate signature key",
+        )?;
         // TODO Normally the application would store the PKCS#8 file persistently. Later it would
         // read the PKCS#8 file from persistent storage to use it.
         let signing_key_pair =
@@ -142,8 +143,9 @@ impl Ed25519Pair {
 
         Ok(Ed25519Pair {
             pkcs8: Some(pkcs8),
-            pair: signature::Ed25519KeyPair::from_pkcs8(input)
-                .chain_err(|| "Failed to load private key")?,
+            pair: signature::Ed25519KeyPair::from_pkcs8(input).chain_err(
+                || "Failed to load private key",
+            )?,
         })
     }
 
