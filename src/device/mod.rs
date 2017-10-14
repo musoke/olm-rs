@@ -5,6 +5,8 @@ use errors::*;
 use olm::{identity_key, one_time_key, ratchet, signing_key};
 use olm::signing_key::SigningKey;
 
+use ruma_identifiers::UserId;
+
 #[derive(Debug)]
 pub struct DeviceId {
     // TODO: Any requirements on format? Spec just says string; most examples seem to be ~10 upper
@@ -34,6 +36,7 @@ where
 }
 
 pub struct LocalDevice {
+    user_id: UserId,
     device_id: DeviceId,
     signing_key_pair: signing_key::Ed25519Pair,
     ident_key_priv: identity_key::Curve25519Priv,
@@ -42,15 +45,25 @@ pub struct LocalDevice {
 }
 
 impl<'a> LocalDevice {
-    /// Initialize a new device
+    /// Initialize a new device for given user
     ///
     /// To be used when creating a new device; use `LocalDevice::from_file` when reloading an old
     /// device.
     ///
     /// ```
-    /// let my_dev = olm::device::LocalDevice::init();
+    /// # #![feature(try_from)]
+    /// use std::convert::TryFrom;
+    ///
+    /// extern crate olm;
+    /// extern crate ruma_identifiers;
+    /// use ruma_identifiers::UserId;
+    ///
+    /// fn main() {
+    ///     let user_id = UserId::try_from("@example:matrix.org").unwrap();
+    ///     let my_dev = olm::device::LocalDevice::init(user_id);
+    /// }
     /// ```
-    pub fn init() -> Result<Self> {
+    pub fn init(user_id: UserId) -> Result<Self> {
         use rand::Rng;
 
         // TODO: Should the device_id be cryptographically random?
@@ -62,6 +75,7 @@ impl<'a> LocalDevice {
         );
 
         Ok(LocalDevice {
+            user_id: user_id,
             device_id: device_id,
             signing_key_pair: signing_key::Ed25519Pair::generate()?,
             ident_key_priv: identity_key::Curve25519Priv::generate()?,
@@ -97,9 +111,19 @@ impl<'a> LocalDevice {
 
     /// # Examples
     /// ```
-    /// let my_dev = olm::device::LocalDevice::init().unwrap();
-    /// let keys = my_dev.get_one_time_keys();
-    /// assert!(my_dev.contains(keys[2]));
+    /// # #![feature(try_from)]
+    /// use std::convert::TryFrom;
+    ///
+    /// extern crate olm;
+    /// extern crate ruma_identifiers;
+    /// use ruma_identifiers::UserId;
+    ///
+    /// fn main() {
+    ///     let user_id = UserId::try_from("@example:matrix.org").unwrap();
+    ///     let my_dev = olm::device::LocalDevice::init(user_id).unwrap();
+    ///     let keys = my_dev.get_one_time_keys();
+    ///     assert!(my_dev.contains(keys[2]));
+    /// }
     /// ```
     pub fn contains(&self, k: &one_time_key::Curve25519Pub) -> bool {
         self.one_time_key_pairs.contains_key(k)
@@ -107,6 +131,7 @@ impl<'a> LocalDevice {
 }
 
 pub struct RemoteDevice {
+    user_id: UserId,
     device_id: DeviceId,
     signing_key: signing_key::Ed25519Pub,
     ident_key: identity_key::Curve25519Pub,
@@ -120,9 +145,19 @@ pub trait Device {
     ///
     /// # Examples
     /// ```
+    /// # #![feature(try_from)]
+    /// use std::convert::TryFrom;
+    ///
+    /// extern crate olm;
     /// use olm::device::Device;
-    /// let d = olm::device::LocalDevice::init().unwrap();
-    /// d.fingerprint_base64();
+    /// extern crate ruma_identifiers;
+    /// use ruma_identifiers::UserId;
+    ///
+    /// fn main() {
+    ///     let user_id = UserId::try_from("@example:matrix.org").unwrap();
+    ///     let my_dev = olm::device::LocalDevice::init(user_id).unwrap();
+    ///     my_dev.fingerprint_base64();
+    /// }
     /// ```
     fn fingerprint_base64(&self) -> String;
 
@@ -131,9 +166,19 @@ pub trait Device {
     /// # Examples
     // TODO use a fixed device and show that the ID is as expected
     /// ```
+    /// # #![feature(try_from)]
+    /// use std::convert::TryFrom;
+    ///
+    /// extern crate olm;
     /// use olm::device::Device;
-    /// let d = olm::device::LocalDevice::init().unwrap();
-    /// d.get_device_id();
+    /// extern crate ruma_identifiers;
+    /// use ruma_identifiers::UserId;
+    ///
+    /// fn main() {
+    ///     let user_id = UserId::try_from("@example:matrix.org").unwrap();
+    ///     let my_dev = olm::device::LocalDevice::init(user_id).unwrap();
+    ///     my_dev.get_device_id();
+    /// }
     /// ```
     fn get_device_id(&self) -> &DeviceId;
 

@@ -21,6 +21,7 @@ extern crate rand;
 extern crate ring;
 extern crate untrusted;
 
+extern crate ruma_identifiers;
 
 pub mod device;
 pub mod olm;
