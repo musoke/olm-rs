@@ -22,6 +22,7 @@ extern crate ring;
 extern crate untrusted;
 
 
+pub mod device;
 pub mod olm;
 pub mod megolm;
 mod util;

@@ -1,7 +1,7 @@
 use std::fmt;
 use untrusted;
 use util;
-use olm::errors::*;
+use errors::*;
 use olm::{identity_key, one_time_key, ratchet, signing_key};
 use olm::signing_key::SigningKey;
 
@@ -25,7 +25,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// let d = ::olm::olm::device::DeviceId::from("DEVID");
+    /// let d = olm::device::DeviceId::from("DEVID");
     /// let s: String = d.to_string();
     /// ```
     fn from(s: S) -> DeviceId {
@@ -48,7 +48,7 @@ impl<'a> LocalDevice {
     /// device.
     ///
     /// ```
-    /// let my_dev = olm::olm::device::LocalDevice::init();
+    /// let my_dev = olm::device::LocalDevice::init();
     /// ```
     pub fn init() -> Result<Self> {
         use rand::Rng;
@@ -97,7 +97,7 @@ impl<'a> LocalDevice {
 
     /// # Examples
     /// ```
-    /// let my_dev = olm::olm::device::LocalDevice::init().unwrap();
+    /// let my_dev = olm::device::LocalDevice::init().unwrap();
     /// let keys = my_dev.get_one_time_keys();
     /// assert!(my_dev.contains(keys[2]));
     /// ```
@@ -120,8 +120,8 @@ pub trait Device {
     ///
     /// # Examples
     /// ```
-    /// use olm::olm::device::Device;
-    /// let d = olm::olm::device::LocalDevice::init().unwrap();
+    /// use olm::device::Device;
+    /// let d = olm::device::LocalDevice::init().unwrap();
     /// d.fingerprint_base64();
     /// ```
     fn fingerprint_base64(&self) -> String;
@@ -131,8 +131,8 @@ pub trait Device {
     /// # Examples
     // TODO use a fixed device and show that the ID is as expected
     /// ```
-    /// use olm::olm::device::Device;
-    /// let d = olm::olm::device::LocalDevice::init().unwrap();
+    /// use olm::device::Device;
+    /// let d = olm::device::LocalDevice::init().unwrap();
     /// d.get_device_id();
     /// ```
     fn get_device_id(&self) -> &DeviceId;
