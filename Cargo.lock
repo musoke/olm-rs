@@ -544,7 +544,7 @@ dependencies = [
 [[package]]
 name = "ruma-client"
 version = "0.1.0"
-source = "git+https://github.com/musoke/ruma-client?branch=unstable-e2e#39071b726184e8ee1ad9fd63426120c041fba410"
+source = "git+https://github.com/musoke/ruma-client?branch=unstable-e2e#9d72bec48629969a64a075f50794e3a18e3ffc96"
 dependencies = [
  "futures 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.6 (registry+https://github.com/rust-lang/crates.io-index)",
