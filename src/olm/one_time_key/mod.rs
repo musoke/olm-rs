@@ -4,6 +4,7 @@ use untrusted;
 use util;
 use olm::errors::*;
 use std::collections::HashMap;
+use std::fmt;
 
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
 // should "inherit" the `OneTimeKey` and `OneTimeKeyPriv` traits from the members.
@@ -40,7 +41,7 @@ pub trait OneTimeKeyPriv: OneTimeKey {
     fn private_key(self) -> (agreement::EphemeralPrivateKey, agreement::EphemeralPrivateKey);
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Curve25519Pub {
     pub_key: Vec<u8>,
 }
@@ -115,6 +116,12 @@ pub struct Curve25519Priv {
     public_key: Vec<u8>,
 }
 
+impl fmt::Debug for Curve25519Priv {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Private one time key with public key {:?}", self.public_key())
+    }
+}
+
 impl Curve25519Priv {
     /// Create new identity key
     ///
@@ -155,7 +162,7 @@ impl Curve25519Priv {
         ))
     }
 
-    /// Create identity key from bytes
+    /// Create one-time key from bytes
     ///
     /// Should only be exposed via `LocalDevice::new()`?
     ///
