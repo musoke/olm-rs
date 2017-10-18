@@ -122,7 +122,7 @@ impl State {
 
         let shared_secret =
             State::x3dh_local(ident_alice, one_time_alice, ident_bob, one_time_bob)?;
-        let (root, chain) = State::kdf_rk_init(shared_secret)?;
+        let (root, chain) = State::kdf_rk_init(shared_secret);
 
         state.root_key = root;
         state.chain_key_sending = Some(chain);
@@ -144,7 +144,7 @@ impl State {
 
         let shared_secret =
             State::x3dh_remote(ident_bob, one_time_bob, ident_alice, one_time_alice)?;
-        let (root, chain) = State::kdf_rk_init(shared_secret)?;
+        let (root, chain) = State::kdf_rk_init(shared_secret);
 
         state.root_key = root;
         state.chain_key_recieve = Some(chain);
@@ -236,8 +236,8 @@ impl State {
         Ok(s)
     }
 
-    /// Derive the initial root key
-    fn kdf_rk_init(shared_secret: Vec<u8>) -> Result<([u8; 32], [u8; 32])> {
+    /// Derive the initial root key and chain key
+    fn kdf_rk_init(shared_secret: Vec<u8>) -> ([u8; 32], [u8; 32]) {
         // TODO: HKDF_HASH should probably be a static
         let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
         let initial_salt: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &[0]);
@@ -255,7 +255,7 @@ impl State {
         root.copy_from_slice(&secret[0..32]);
         chain.copy_from_slice(&secret[32..64]);
 
-        Ok((root, chain))
+        (root, chain)
     }
 
     pub fn encrypt(&mut self, plaintext: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)> {
