@@ -258,6 +258,24 @@ impl State {
         (root, chain)
     }
 
+    /// Advance the root key and return the new root key and chain key
+    pub fn kdf_rk(&mut self, dh_out: Vec<u8>) -> ([u8; 32], [u8; 32]) {
+        // TODO: HKDF_HASH should probably be a static
+        let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
+        let salt: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &self.root_key);
+
+        let mut secret: [u8; 512] = [0; 512];
+        hkdf::extract_and_expand(salt, &dh_out, b"OLM_RATCHET", &mut secret);
+
+        let mut root: [u8; 32] = [0; 32];
+        let mut chain: [u8; 32] = [0; 32];
+
+        root.copy_from_slice(&secret[0..32]);
+        chain.copy_from_slice(&secret[32..64]);
+
+        (root, chain)
+    }
+
     pub fn encrypt(&mut self, plaintext: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)> {
 
         let mk = State::kdf_mk(&self.chain_key_sending.expect(
