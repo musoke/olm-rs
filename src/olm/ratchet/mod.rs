@@ -66,6 +66,48 @@ impl Ratchet {
         one_time_bob: one_time_key::Curve25519Pub,
         dh_bob: one_time_key::Curve25519Pub,
     ) -> Result<Self> {
+
+        let state =
+            State::init_sending(ident_alice, one_time_alice, ident_bob, one_time_bob, dh_bob)
+                .chain_err(|| "Failed to initialize ratchet for sending")?;
+
+        Ok(Ratchet {
+            id: RatchetId {},
+            algorithm: (),
+            state: state,
+        })
+    }
+
+    pub fn init_recieving(
+        // TODO: ident_bob should not be consumed once it is non-ephemeral
+        ident_bob: identity_key::Curve25519Priv,
+        one_time_bob: one_time_key::Curve25519Priv,
+        ident_alice: &identity_key::Curve25519Pub,
+        one_time_alice: one_time_key::Curve25519Pub,
+        dh_bob: one_time_key::Curve25519Priv,
+    ) -> Result<Self> {
+
+        let state =
+            State::init_recieving(ident_bob, one_time_bob, ident_alice, one_time_alice, dh_bob)
+                .chain_err(|| "Failed to initialize ratchet for receiving")?;
+
+        Ok(Ratchet {
+            id: RatchetId {},
+            algorithm: (),
+            state: state,
+        })
+    }
+}
+
+impl State {
+    pub fn init_sending(
+        ident_alice: identity_key::Curve25519Priv,
+        one_time_alice: one_time_key::Curve25519Priv,
+        // TODO: ident_bob should not be consumed once it is non-ephemeral
+        ident_bob: &identity_key::Curve25519Pub,
+        one_time_bob: one_time_key::Curve25519Pub,
+        dh_bob: one_time_key::Curve25519Pub,
+    ) -> Result<Self> {
         let mut state: State = Default::default();
 
         let (_, dh_self_priv) = one_time_key::Curve25519Priv::generate_fixed(1)?;
@@ -73,17 +115,13 @@ impl Ratchet {
         state.dh_remote = Some(dh_bob);
 
         let shared_secret =
-            Ratchet::x3dh_local(ident_alice, one_time_alice, ident_bob, one_time_bob)?;
-        let (root, chain) = Ratchet::kdf_rk_init(shared_secret)?;
+            State::x3dh_local(ident_alice, one_time_alice, ident_bob, one_time_bob)?;
+        let (root, chain) = State::kdf_rk_init(shared_secret)?;
 
         state.root_key = root;
         state.chain_key_sending = Some(chain);
 
-        Ok(Ratchet {
-            id: RatchetId {},
-            state: state,
-            algorithm: (),
-        })
+        Ok(state)
     }
 
     pub fn init_recieving(
@@ -99,17 +137,13 @@ impl Ratchet {
         state.dh_self = Some(dh_bob);
 
         let shared_secret =
-            Ratchet::x3dh_remote(ident_bob, one_time_bob, ident_alice, one_time_alice)?;
-        let (root, chain) = Ratchet::kdf_rk_init(shared_secret)?;
+            State::x3dh_remote(ident_bob, one_time_bob, ident_alice, one_time_alice)?;
+        let (root, chain) = State::kdf_rk_init(shared_secret)?;
 
         state.root_key = root;
         state.chain_key_recieve = Some(chain);
 
-        Ok(Ratchet {
-            id: RatchetId {},
-            state: state,
-            algorithm: (),
-        })
+        Ok(state)
     }
 
     fn x3dh_local(
@@ -196,6 +230,7 @@ impl Ratchet {
         Ok(s)
     }
 
+    /// Derive the initial root key
     fn kdf_rk_init(shared_secret: Vec<u8>) -> Result<([u8; 32], [u8; 32])> {
         // TODO: HKDF_HASH should probably be a static
         let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
@@ -216,22 +251,12 @@ impl Ratchet {
 
         Ok((root, chain))
     }
-
-    pub fn import() -> Self {
-        unimplemented!()
-    }
-
-    pub fn export() -> Self {
-        unimplemented!()
-    }
 }
 
 impl Ratchet {
     pub fn id(&self) -> RatchetId {
         self.id.clone()
     }
-    pub fn advance_root(&mut self) {}
-    pub fn advance_message(&mut self) {}
 }
 
 #[cfg(test)]
