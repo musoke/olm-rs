@@ -242,7 +242,7 @@ impl State {
         let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
         let initial_salt: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &[0]);
 
-        let mut secret: [u8; 512] = [0; 512];
+        let mut secret: [u8; 64] = [0; 64];
         hkdf::extract_and_expand(
             initial_salt,
             &shared_secret,
