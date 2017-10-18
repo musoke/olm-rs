@@ -20,6 +20,21 @@ Initialization of ratchets: Double Ratchet applies the same `KDF_RK` to the
 shared secret as when advancing the root key under normal operation. Olm
 applies a HKDF with a different info (`OLM_ROOT` instead of `OLM_RATCHET`).
 
+## Todo
+
+  - Better one-time keys: `ring` currently only has ephemeral Diffie-Hellman keys.
+    These can only be used once.
+
+    For this reason, identity keys are currently only usable once.
+    This is good enough for simple testing.
+
+    This is not feaible for the one-time keys; they are actually used twice each.
+    I have gotten around this by generating non-random pairs of identical
+    ephemeral one-time keys.
+    Should remove all instances of
+    `olm::olm::one_time_keys::Curve25519Prive::generate_fixed()`.
+
+
 # Warning
 
 __I am not a cryptographer.  Assume I know nothing about cryptography.
