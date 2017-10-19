@@ -333,20 +333,16 @@ impl Ratchet {
 mod test {
 
     use olm::{identity_key, one_time_key};
-    use olm::identity_key::IdentityKey;
+    use olm::identity_key::{IdentityKey, IdentityKeyPriv};
     use olm::one_time_key::{OneTimeKey, OneTimeKeyPriv};
     use olm::ratchet::Ratchet;
 
     fn generate_ratchets() -> (Ratchet, Ratchet) {
 
-        let alice_ident_priv = identity_key::Curve25519Priv::generate().unwrap();
-        let alice_ident_pub = identity_key::Curve25519Pub::from(Vec::from(
-            alice_ident_priv.public_key().as_slice_less_safe(),
-        ));
-        let bob_ident_priv = identity_key::Curve25519Priv::generate().unwrap();
-        let bob_ident_pub = identity_key::Curve25519Pub::from(
-            Vec::from(bob_ident_priv.public_key().as_slice_less_safe()),
-        );
+        let alice_ident_priv = identity_key::Curve25519Priv::generate_unrandom().unwrap();
+        let alice_ident_pub = alice_ident_priv.public_key();
+        let bob_ident_priv = identity_key::Curve25519Priv::generate_unrandom().unwrap();
+        let bob_ident_pub = bob_ident_priv.public_key();
 
         let alice_one_time_priv = one_time_key::Curve25519Priv::generate_unrandom().unwrap();
         let alice_one_time_pub = alice_one_time_priv.public_key();

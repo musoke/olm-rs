@@ -3,11 +3,12 @@ use ring::agreement;
 use untrusted;
 use util;
 use olm::errors::*;
+use std::fmt;
 
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
 // should "inherit" the `IdentityKey` and `IdentityKeyPriv` traits from the members.
 
-// enum IdentityKeyTypes {
+// enum Algorithm {
 //     Ed25519(Curve25519Pub),
 //     #[doc(hidden)] __Nonexhaustive,
 // }
@@ -31,14 +32,16 @@ pub trait IdentityKey {
 /// Trait exposing methods on a private key
 ///
 /// This should normally only be used in `olm::device` and `olm::ratchet`
-///
-/// Require that the type also implements `IdentityKey` so that one can get the public key.
-pub trait IdentityKeyPriv: IdentityKey {
+pub trait IdentityKeyPriv {
+    type Public: IdentityKey;
+
     // TODO: This should not be ephemeral; need updates to ring.  Then can pass a reference to
     // self instead of consuming.
-    fn private_key(self) -> agreement::EphemeralPrivateKey;
+    fn private_key(&self) -> agreement::EphemeralPrivateKey;
+    fn public_key(&self) -> Self::Public;
 }
 
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Curve25519Pub {
     pub_key: Vec<u8>,
 }
@@ -48,41 +51,6 @@ impl IdentityKey for Curve25519Pub {
         untrusted::Input::from(&self.pub_key)
     }
 }
-
-// use std::convert::TryFrom;
-// impl<S> TryFrom<S> for Curve25519Pub
-// where
-//     S: Into<String>,
-// {
-//     type Error = Error;
-//     /// Convert base64 encoded strings to public keys
-//     ///
-//     /// Can fail if base64 is malformed.  No checks are done that the resulting public key is
-//     /// indeed a valid public key.
-//     ///
-//     /// # Examples
-//     ///
-//     /// ```
-//     /// #![feature(try_from)]
-//     /// use std::convert::TryFrom;
-//     ///
-//     /// let a = olm::olm::identity_key::Curve25519Pub
-//     ///         ::try_from("JGLn/yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
-//     /// assert!(a.is_ok());
-//     ///
-//     /// let b = olm::olm::identity_key::Curve25519Pub
-//     ///         ::try_from("JGLn_yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
-//     /// assert!(b.is_err());
-//     ///
-//     /// ```
-//     fn try_from(s: S) -> Result<Self> {
-//         Ok(Curve25519Pub {
-//             pub_key: util::base64_to_bin(&s.into())
-//                 .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
-//                 .chain_err(|| "failed to read public identity key")?,
-//         })
-//     }
-// }
 
 impl From<Vec<u8>> for Curve25519Pub {
     /// Create public Curve25519 key from bytes
@@ -99,8 +67,20 @@ impl From<Vec<u8>> for Curve25519Pub {
 /// Currently is ephemeral; should be persistent.  See
 /// https://github.com/briansmith/ring/issues/331
 pub struct Curve25519Priv {
+    // TODO: remove seed field; need updates to ring.
+    seed: u8,
     private_key: agreement::EphemeralPrivateKey,
     public_key: Vec<u8>,
+}
+
+impl fmt::Debug for Curve25519Priv {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Private identity key with public key {:?}",
+            self.public_key()
+        )
+    }
 }
 
 impl Curve25519Priv {
@@ -108,8 +88,17 @@ impl Curve25519Priv {
     ///
     /// Should only be exposed via `LocalDevice::new()`?
     pub fn generate() -> Result<Self> {
+        unimplemented!()
+    }
+
+    /// This is a temporary hack
+    pub fn generate_unrandom() -> Result<Self> {
+
+        use rand;
+        let seed = rand::random::<u8>();
+
         // TODO share one rng among all of lib
-        let rng = ring::rand::SystemRandom::new();
+        let rng = ring::test::rand::FixedByteRandom { byte: seed };
 
         // Generate a new identity key
         let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
@@ -123,6 +112,7 @@ impl Curve25519Priv {
         );
 
         Ok(Curve25519Priv {
+            seed: seed,
             private_key: private_key,
             public_key: Vec::from(public_key),
         })
@@ -139,14 +129,22 @@ impl Curve25519Priv {
     }
 }
 
-impl IdentityKey for Curve25519Priv {
-    fn public_key(&self) -> untrusted::Input {
-        untrusted::Input::from(&self.public_key)
-    }
-}
-
 impl IdentityKeyPriv for Curve25519Priv {
-    fn private_key(self) -> agreement::EphemeralPrivateKey {
-        self.private_key
+    type Public = Curve25519Pub;
+
+    fn private_key(&self) -> agreement::EphemeralPrivateKey {
+        let rng = ring::test::rand::FixedByteRandom { byte: self.seed };
+        // Generate that same new one-time key
+        let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
+            .chain_err(|| "Unable to generate one-time key")
+            .expect(
+                "This call to agreement::EpemeralPrivateKey::generate will not be in final version",
+            );
+
+        private_key
+    }
+
+    fn public_key(&self) -> Self::Public {
+        Curve25519Pub::from(self.public_key.clone())
     }
 }
