@@ -274,6 +274,21 @@ impl State {
         (root, chain)
     }
 
+    fn ecdh(
+        dh_self: one_time_key::Curve25519Priv,
+        dh_remote: one_time_key::Curve25519Pub,
+    ) -> Result<Vec<u8>> {
+        let mut secret = agreement::agree_ephemeral(
+            dh_self.private_key(),
+            &agreement::X25519,
+            dh_remote.public_key(),
+            ring::error::Unspecified,
+            |s| Ok(s.to_vec()),
+        ).chain_err(|| "Agreement error")?;
+
+        Ok(secret)
+    }
+
     pub fn encrypt(&mut self, plaintext: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)> {
 
         let mk = State::kdf_mk(&self.chain_key_sending.expect(
