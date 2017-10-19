@@ -159,23 +159,24 @@ impl OneTimeKeyPriv for Curve25519Priv {
     }
 }
 
-const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: usize = 5;
-
 pub struct Store {
     // TODO value should be enum of private key types
     pub hashmap: HashMap<Curve25519Pub, Curve25519Priv>,
 }
 
 impl Store {
+    pub const DEFAULT_NUM_ONE_TIME_KEY_PAIRS: usize = 20;
+
     /// Generate one time keys
     ///
     /// ```
     /// let s = olm::olm::one_time_key::Store::generate().expect("Can generate onetime key store");
     /// ```
     pub fn generate() -> Result<Self> {
-        let mut store = Store { hashmap: HashMap::with_capacity(DEFAULT_NUM_ONE_TIME_KEY_PAIRS) };
+        let mut store =
+            Store { hashmap: HashMap::with_capacity(Self::DEFAULT_NUM_ONE_TIME_KEY_PAIRS) };
 
-        for i in 0..DEFAULT_NUM_ONE_TIME_KEY_PAIRS {
+        for _ in 0..Self::DEFAULT_NUM_ONE_TIME_KEY_PAIRS {
             // TODO generate an actual random key
             let s = Curve25519Priv::generate_unrandom()?;
             let p = s.public_key();
