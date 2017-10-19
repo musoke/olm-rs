@@ -116,7 +116,7 @@ impl State {
     ) -> Result<Self> {
         let mut state: State = Default::default();
 
-        let (_, dh_self_priv) = one_time_key::Curve25519Priv::generate_fixed(1)?;
+        let dh_self_priv = one_time_key::Curve25519Priv::generate_unrandom()?;
         state.dh_self = Some(dh_self_priv);
         state.dh_remote = Some(dh_bob);
 
@@ -160,7 +160,6 @@ impl State {
         one_time_remote: one_time_key::Curve25519Pub,
     ) -> Result<Vec<u8>> {
         // TODO: change once non-ephemeral keys are available
-        let (one_time_local_1, one_time_local_2) = one_time_local.private_key();
 
         let mut secret_1 = agreement::agree_ephemeral(
             ident_local.private_key(),
@@ -171,7 +170,7 @@ impl State {
         ).chain_err(|| "Agreement error")?;
 
         let mut secret_2 = agreement::agree_ephemeral(
-            one_time_local_1,
+            one_time_local.private_key(),
             &agreement::X25519,
             ident_remote.public_key(),
             ring::error::Unspecified,
@@ -179,7 +178,7 @@ impl State {
         ).chain_err(|| "Agreement error")?;
 
         let mut secret_3 = agreement::agree_ephemeral(
-            one_time_local_2,
+            one_time_local.private_key(),
             &agreement::X25519,
             one_time_remote.public_key(),
             ring::error::Unspecified,
@@ -202,10 +201,9 @@ impl State {
         one_time_remote: one_time_key::Curve25519Pub,
     ) -> Result<Vec<u8>> {
         // TODO: change once non-ephemeral keys are available
-        let (one_time_local_1, one_time_local_2) = one_time_local.private_key();
 
         let mut secret_1 = agreement::agree_ephemeral(
-            one_time_local_1,
+            one_time_local.private_key(),
             &agreement::X25519,
             ident_remote.public_key(),
             ring::error::Unspecified,
@@ -221,7 +219,7 @@ impl State {
         ).chain_err(|| "Agreement error")?;
 
         let mut secret_3 = agreement::agree_ephemeral(
-            one_time_local_2,
+            one_time_local.private_key(),
             &agreement::X25519,
             one_time_remote.public_key(),
             ring::error::Unspecified,
@@ -336,7 +334,7 @@ mod test {
 
     use olm::{identity_key, one_time_key};
     use olm::identity_key::IdentityKey;
-    use olm::one_time_key::OneTimeKey;
+    use olm::one_time_key::{OneTimeKey, OneTimeKeyPriv};
     use olm::ratchet::Ratchet;
 
     fn generate_ratchets() -> (Ratchet, Ratchet) {
@@ -350,19 +348,19 @@ mod test {
             Vec::from(bob_ident_priv.public_key().as_slice_less_safe()),
         );
 
-        let (alice_one_time_pub, alice_one_time_priv) =
-            one_time_key::Curve25519Priv::generate_fixed(0).unwrap();
-        let (bob_one_time_pub, bob_one_time_priv) = one_time_key::Curve25519Priv::generate_fixed(1)
-            .unwrap();
+        let alice_one_time_priv = one_time_key::Curve25519Priv::generate_unrandom().unwrap();
+        let alice_one_time_pub = alice_one_time_priv.public_key();
+        let bob_one_time_priv = one_time_key::Curve25519Priv::generate_unrandom().unwrap();
+        let bob_one_time_pub = bob_one_time_priv.public_key();
 
-        let (dh_bob_pub, dh_bob_priv) = one_time_key::Curve25519Priv::generate_fixed(2).unwrap();
+        let dh_bob_priv = one_time_key::Curve25519Priv::generate_unrandom().unwrap();
 
         let ratchet_alice = Ratchet::init_sending(
             alice_ident_priv,
             alice_one_time_priv,
             &bob_ident_pub,
             bob_one_time_pub,
-            dh_bob_pub,
+            dh_bob_priv.public_key(),
         ).unwrap();
 
         let ratchet_bob = Ratchet::init_recieving(

@@ -25,14 +25,12 @@ applies a HKDF with a different info (`OLM_ROOT` instead of `OLM_RATCHET`).
   - Better one-time keys: `ring` currently only has ephemeral Diffie-Hellman keys.
     These can only be used once.
 
-    For this reason, identity keys are currently only usable once.
-    This is good enough for simple testing.
-
-    This is not feaible for the one-time keys; they are actually used twice each.
-    I have gotten around this by generating non-random pairs of identical
-    ephemeral one-time keys.
-    Should remove all instances of
-    `olm::olm::one_time_keys::Curve25519Prive::generate_fixed()`.
+    For this reason, identity keys and one-time keys are generated through
+    `::generate_unrandom()`.
+    This stores a random `u8` seed, which is then used to return a consistent
+    private key.
+    This is good enough for simple compatibility testing, but obviously
+    horribly insceure for actual use.
 
 
 # Warning

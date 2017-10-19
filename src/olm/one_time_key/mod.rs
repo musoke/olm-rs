@@ -9,7 +9,7 @@ use std::fmt;
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
 // should "inherit" the `OneTimeKey` and `OneTimeKeyPriv` traits from the members.
 
-// enum OneTimeKeyTypes {
+// enum Algorithm {
 //     Ed25519(Curve25519Pub),
 //     #[doc(hidden)] __Nonexhaustive,
 // }
@@ -33,12 +33,13 @@ pub trait OneTimeKey {
 /// Trait exposing methods on a private key
 ///
 /// This should normally only be used in `olm::device` and `olm::ratchet`
-///
-/// Require that the type also implements `OneTimeKey` so that one can get the public key.
-pub trait OneTimeKeyPriv: OneTimeKey {
+pub trait OneTimeKeyPriv {
+    type Public: OneTimeKey;
+
     // TODO: This should not be ephemeral; need updates to ring.  Then can pass a reference to
     // self instead of consuming.
-    fn private_key(self) -> (agreement::EphemeralPrivateKey, agreement::EphemeralPrivateKey);
+    fn private_key(&self) -> agreement::EphemeralPrivateKey;
+    fn public_key(&self) -> Self::Public;
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -58,41 +59,6 @@ impl Into<Vec<u8>> for Curve25519Pub {
     }
 }
 
-// use std::convert::TryFrom;
-// impl<S> TryFrom<S> for Curve25519Pub
-// where
-//     S: Into<String>,
-// {
-//     type Error = Error;
-//     /// Convert base64 encoded strings to public keys
-//     ///
-//     /// Can fail if base64 is malformed.  No checks are done that the resulting public key is
-//     /// indeed a valid public key.
-//     ///
-//     /// # Examples
-//     ///
-//     /// ```
-//     /// #![feature(try_from)]
-//     /// use std::convert::TryFrom;
-//     ///
-//     /// let a = olm::olm::one_time_key::Curve25519Pub
-//     ///         ::try_from("JGLn/yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
-//     /// assert!(a.is_ok());
-//     ///
-//     /// let b = olm::olm::one_time_key::Curve25519Pub
-//     ///         ::try_from("JGLn_yafz74HB2AbPLYJWIVGnKAtqECOBf11yyXac2Y");
-//     /// assert!(b.is_err());
-//     ///
-//     /// ```
-//     fn try_from(s: S) -> Result<Self> {
-//         Ok(Curve25519Pub {
-//             pub_key: util::base64_to_bin(&s.into())
-//                 .chain_err::<_, ErrorKind>(|| ErrorKind::Base64DecodeError)
-//                 .chain_err(|| "failed to read public identity key")?,
-//         })
-//     }
-// }
-
 impl From<Vec<u8>> for Curve25519Pub {
     /// Create public Curve25519 key from bytes
     ///
@@ -103,63 +69,63 @@ impl From<Vec<u8>> for Curve25519Pub {
     }
 }
 
-/// Private identity key
+/// Private one-time key
 ///
 /// Currently is ephemeral; should be persistent.  See
 /// https://github.com/briansmith/ring/issues/331
 ///
-/// Since we need to use each private key twice in the course of the agreement, store 2 identical
-/// copies in a tuple.  They are identical because for now they aren't even random.  Hopefully this
-/// will be fixable in the near future.
+/// Since we need to use each private key twice in the course of the agreement, store a seed from
+/// which the private key can be regenerated.  Hopefully this will be fixable in the near future.
 pub struct Curve25519Priv {
-    private_key: (agreement::EphemeralPrivateKey, agreement::EphemeralPrivateKey),
+    // TODO: remove need for this seed
+    seed: u8,
+    private_key: agreement::EphemeralPrivateKey,
     public_key: Vec<u8>,
 }
 
 impl fmt::Debug for Curve25519Priv {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Private one time key with public key {:?}", self.public_key())
+        write!(
+            f,
+            "Private one time key with public key {:?}",
+            self.public_key()
+        )
     }
 }
 
 impl Curve25519Priv {
-    /// Create new identity key
+    /// Create new one-time key
     ///
     /// Should only be exposed via `LocalDevice::new()`?
     pub fn generate() -> Result<Self> {
         unimplemented!()
     }
 
-    pub fn generate_fixed(i: u8) -> Result<(Curve25519Pub, Self)> {
+    /// This is a temporary hack
+    pub fn generate_unrandom() -> Result<Self> {
+
+        use rand;
+        let seed = rand::random::<u8>();
+
         // TODO share one rng among all of lib
-        let rng = ring::test::rand::FixedByteRandom { byte: i };
+        let rng = ring::test::rand::FixedByteRandom { byte: seed };
 
-        // Generate a new identity key
-        let private_key_1 = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
-            .chain_err(|| "Unable to generate identity key")?;
-        let private_key_2 = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
-            .chain_err(|| "Unable to generate identity key")?;
-
+        // Generate a new one-time key
+        let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
+            .chain_err(|| "Unable to generate one-time key")?;
 
         // Calculate corresponding public key
-        let mut public_key_1 = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
-        let public_key_1 = &mut public_key_1[..private_key_1.public_key_len()];
-        private_key_1.compute_public_key(public_key_1).expect(
-            "can get public key from generated private key",
-        );
-        let mut public_key_2 = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
-        let public_key_2 = &mut public_key_2[..private_key_2.public_key_len()];
-        private_key_2.compute_public_key(public_key_2).expect(
+        let mut public_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
+        let public_key = &mut public_key[..private_key.public_key_len()];
+        private_key.compute_public_key(public_key).expect(
             "can get public key from generated private key",
         );
 
-        Ok((
-            Curve25519Pub::from(Vec::from(public_key_1)),
-            Curve25519Priv {
-                private_key: (private_key_1, private_key_2),
-                public_key: Vec::from(public_key_2),
-            },
-        ))
+        Ok(Curve25519Priv {
+            seed: seed,
+            private_key: private_key,
+            public_key: Vec::from(public_key),
+        })
     }
 
     /// Create one-time key from bytes
@@ -173,15 +139,23 @@ impl Curve25519Priv {
     }
 }
 
-impl OneTimeKey for Curve25519Priv {
-    fn public_key(&self) -> untrusted::Input {
-        untrusted::Input::from(&self.public_key)
-    }
-}
-
 impl OneTimeKeyPriv for Curve25519Priv {
-    fn private_key(self) -> (agreement::EphemeralPrivateKey, agreement::EphemeralPrivateKey) {
-        self.private_key
+    type Public = Curve25519Pub;
+
+    fn private_key(&self) -> agreement::EphemeralPrivateKey {
+        let rng = ring::test::rand::FixedByteRandom { byte: self.seed };
+        // Generate that same new one-time key
+        let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
+            .chain_err(|| "Unable to generate one-time key")
+            .expect(
+                "This call to agreement::EpemeralPrivateKey::generate will not be in final version",
+            );
+
+        private_key
+    }
+
+    fn public_key(&self) -> Self::Public {
+        Curve25519Pub::from(self.public_key.clone())
     }
 }
 
@@ -203,7 +177,8 @@ impl Store {
 
         for i in 0..DEFAULT_NUM_ONE_TIME_KEY_PAIRS {
             // TODO generate an actual random key
-            let (p, s) = Curve25519Priv::generate_fixed(i as u8)?;
+            let s = Curve25519Priv::generate_unrandom()?;
+            let p = s.public_key();
             store.insert(p, s);
         }
 
@@ -242,4 +217,42 @@ impl Store {
     pub fn insert(&mut self, p: Curve25519Pub, s: Curve25519Priv) {
         self.hashmap.insert(p, s);
     }
+}
+
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn consistent_one_time() {
+
+        let a = Curve25519Priv::generate_unrandom().unwrap();
+        let b = Curve25519Priv::generate_unrandom().unwrap();
+
+        let a_pub = a.public_key();
+        let b_pub = b.public_key();
+
+        assert_ne!(a_pub.public_key(), b_pub.public_key());
+
+        let dh1 = agreement::agree_ephemeral(
+            a.private_key(),
+            &agreement::X25519,
+            b_pub.public_key(),
+            Error::from("asdf"),
+            |d| Ok(d.to_vec()),
+        ).unwrap();
+
+        let dh2 = agreement::agree_ephemeral(
+            a.private_key(),
+            &agreement::X25519,
+            b_pub.public_key(),
+            Error::from("asdf"),
+            |d| Ok(d.to_vec()),
+        ).unwrap();
+
+        assert_eq!(dh1, dh2);
+    }
+
 }
