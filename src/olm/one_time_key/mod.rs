@@ -42,7 +42,8 @@ pub trait OneTimeKeyPriv {
     fn public_key(&self) -> Self::Public;
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Curve25519Pub {
     pub_key: Vec<u8>,
 }

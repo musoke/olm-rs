@@ -10,6 +10,8 @@ dependencies = [
  "ruma-client 0.1.0 (git+https://github.com/musoke/ruma-client?branch=unstable-e2e)",
  "ruma-events 0.9.0 (git+https://github.com/jplatte/ruma-events?branch=synapse-workarounds)",
  "ruma-identifiers 0.11.0 (git+https://github.com/jplatte/ruma-identifiers?branch=synapse-workarounds)",
+ "serde 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "untrusted 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)",

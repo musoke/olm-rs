@@ -39,6 +39,7 @@ struct RatchetId {}
 struct Ratchet {
     id: RatchetId,
     algorithm: (),
+    pre_key: bool,
     state: State,
 }
 
@@ -50,11 +51,18 @@ struct State {
     dh_remote: Option<one_time_key::Curve25519Pub>,
     root_key: [u8; 32],
     chain_key_sending: Option<[u8; 32]>,
-    chain_key_recieve: Option<[u8; 32]>,
-    n_sending: u64,
-    n_recieve: u64,
-    n_previous: u64,
-    mk_skipped: HashMap<(u64, u64), ()>,
+    chain_key_receive: Option<[u8; 32]>,
+    n_sending: usize,
+    n_receive: usize,
+    n_previous: usize,
+    mk_skipped: HashMap<(one_time_key::Curve25519Pub, usize), [u8; 32]>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct MessageHeader {
+    pub dh_key: one_time_key::Curve25519Pub,
+    pub n_previous: usize,
+    pub n: usize,
 }
 
 impl Ratchet {
@@ -74,11 +82,12 @@ impl Ratchet {
         Ok(Ratchet {
             id: RatchetId {},
             algorithm: (),
+            pre_key: true,
             state: state,
         })
     }
 
-    pub fn init_recieving(
+    pub fn init_receiving(
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: identity_key::Curve25519Priv,
         one_time_bob: one_time_key::Curve25519Priv,
@@ -88,24 +97,36 @@ impl Ratchet {
     ) -> Result<Self> {
 
         let state =
-            State::init_recieving(ident_bob, one_time_bob, ident_alice, one_time_alice, dh_bob)
+            State::init_receiving(ident_bob, one_time_bob, ident_alice, one_time_alice, dh_bob)
                 .chain_err(|| "Failed to initialize ratchet for receiving")?;
 
         Ok(Ratchet {
             id: RatchetId {},
             algorithm: (),
+            pre_key: false,
             state: state,
         })
     }
 
     pub fn encrypt(&mut self, plaintext: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)> {
-        let enc = self.state.encrypt(plaintext)?;
+        let (chain_index, dh_pub, ciphertext) = self.state.state_encrypt(plaintext)?;
+
+        unimplemented!()
+    }
+
+    pub fn decrypt(&mut self, header: MessageHeader, ciphertext: Vec<u8>) -> Result<Vec<u8>> {
+        let plaintext = self.state.state_decrypt(header, ciphertext)?;
 
         unimplemented!()
     }
 }
 
 impl State {
+    // TODO: what does Olm define?
+    // The double ratchet docs say this should be identical across implementations.
+    // https://signal.org/docs/specifications/doubleratchet/#implementation-fingerprinting
+    const MAX_SKIP: usize = 1000;
+
     pub fn init_sending(
         ident_alice: identity_key::Curve25519Priv,
         one_time_alice: one_time_key::Curve25519Priv,
@@ -130,7 +151,7 @@ impl State {
         Ok(state)
     }
 
-    pub fn init_recieving(
+    pub fn init_receiving(
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: identity_key::Curve25519Priv,
         one_time_bob: one_time_key::Curve25519Priv,
@@ -147,7 +168,7 @@ impl State {
         let (root, chain) = State::kdf_rk_init(shared_secret);
 
         state.root_key = root;
-        state.chain_key_recieve = Some(chain);
+        state.chain_key_receive = Some(chain);
 
         Ok(state)
     }
@@ -256,8 +277,36 @@ impl State {
         (root, chain)
     }
 
+    fn dh_ratchet(&mut self, header: &MessageHeader) -> Result<()> {
+        self.n_previous = self.n_sending;
+        self.n_sending = 0;
+        self.n_receive = 0;
+        // TODO: remove clone
+        self.dh_remote = Some(header.dh_key.clone());
+
+        // Ratchet to get new receiving chain
+        let (rk, ckr) = self.kdf_rk(State::ecdh(
+            self.dh_self.expect("Should be generated already"),
+            &self.dh_remote.expect("Set value to Some above").clone(),
+        )?);
+        self.root_key = rk;
+        self.chain_key_receive = Some(ckr);
+
+        self.dh_self = Some(one_time_key::Curve25519Priv::generate_unrandom()?);
+
+        // Ratchet to get new sending chain
+        let (rk, cks) = self.kdf_rk(State::ecdh(
+            self.dh_self.expect("Set value to Some above"),
+            &self.dh_remote.expect("Set value to Some above").clone(),
+        )?);
+        self.root_key = rk;
+        self.chain_key_sending = Some(cks);
+
+        Ok(())
+    }
+
     /// Advance the root key and return the new root key and chain key
-    pub fn kdf_rk(&mut self, dh_out: Vec<u8>) -> ([u8; 32], [u8; 32]) {
+    fn kdf_rk(&mut self, dh_out: Vec<u8>) -> ([u8; 32], [u8; 32]) {
         // TODO: HKDF_HASH should probably be a static
         let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
         let salt: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &self.root_key);
@@ -275,8 +324,8 @@ impl State {
     }
 
     fn ecdh(
-        dh_self: one_time_key::Curve25519Priv,
-        dh_remote: one_time_key::Curve25519Pub,
+        dh_self: &one_time_key::Curve25519Priv,
+        dh_remote: &one_time_key::Curve25519Pub,
     ) -> Result<Vec<u8>> {
         let mut secret = agreement::agree_ephemeral(
             dh_self.private_key(),
@@ -289,17 +338,94 @@ impl State {
         Ok(secret)
     }
 
-    pub fn encrypt(&mut self, plaintext: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)> {
+    pub fn state_encrypt(
+        &mut self,
+        plaintext: Vec<u8>,
+    ) -> Result<(usize, one_time_key::Curve25519Pub, Vec<u8>)> {
 
-        let mk = State::kdf_mk(&self.chain_key_sending.expect(
-            "Should have a sending chain",
-        ));
-        self.chain_key_sending = Some(State::kdf_ck(
-            self.chain_key_sending.expect("Should have a sending chain"),
-        ));
+        let (ck, mk) = State::kdf_ck(self.chain_key_sending.expect("Should have a sending chain"));
+        self.chain_key_sending = Some(ck);
 
         self.n_sending += 1;
 
+        let ciphertext = State::encrypt(mk, &plaintext).chain_err(
+            || "Failed to encrypt message",
+        )?;
+
+        unimplemented!()
+    }
+
+    pub fn state_decrypt(&mut self, header: MessageHeader, ciphertext: Vec<u8>) -> Result<Vec<u8>> {
+        if let Some(plaintext) = self.try_skipped_message_keys(&header, &ciphertext)? {
+            Ok(plaintext)
+        } else {
+            match self.dh_remote {
+                // TODO this should only match when the two dh_keys are equal. Advancing the root
+                // key is broken until this is fixed.
+                Some(ref dh_receiving) => {}
+                None | Some(_) => {
+                    self.skip_message_keys(header.n_previous)?;
+                    self.dh_ratchet(&header);
+                }
+            }
+
+            self.skip_message_keys(header.n)?;
+
+            let (ckr, mk) =
+                State::kdf_ck(self.chain_key_receive.expect("Should have a sending chain"));
+            self.chain_key_receive = Some(ckr);
+            self.n_receive += 1;
+
+            State::decrypt(mk, &ciphertext, &header).chain_err(|| "Failed to decrypt message")
+        }
+    }
+
+    fn try_skipped_message_keys(
+        &mut self,
+        header: &MessageHeader,
+        ciphertext: &Vec<u8>,
+    ) -> Result<Option<Vec<u8>>> {
+        // TODO Note that this consumes the mk. I think this is the correct behaviour, but should
+        // confirm.
+        // TODO is there a way around cloning dh_key?
+        if let Some(mk) = self.mk_skipped.remove(&(header.dh_key.clone(), header.n)) {
+            Ok(Some(State::decrypt(mk, ciphertext, (header)).chain_err(
+                || "Failed to decrypt skipped message",
+            )?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn skip_message_keys(&mut self, until: usize) -> Result<()> {
+        if self.n_receive + State::MAX_SKIP < until {
+            // Error::from("sdf")
+            unimplemented!()
+        } else if self.chain_key_receive.is_some() {
+            while self.n_receive < until {
+                let (ck, mk) = State::kdf_ck(self.chain_key_receive.unwrap());
+                self.mk_skipped.insert(
+                    (
+                        // TODO remove this clone
+                        self.dh_remote.clone().expect("dh_receive set before this"),
+                        self.n_receive,
+                    ),
+                    mk,
+                );
+                self.chain_key_receive = Some(ck);
+                self.n_receive += 1;
+            }
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn encrypt(mk: [u8; 32], plaintext: &Vec<u8>) -> Result<Vec<u8>> {
+        unimplemented!()
+    }
+
+    fn decrypt(mk: [u8; 32], ciphertext: &Vec<u8>, header: &MessageHeader) -> Result<Vec<u8>> {
         unimplemented!()
     }
 
@@ -309,6 +435,7 @@ impl State {
         let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
         let c: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, ck);
 
+        // TODO: is this correct?
         let data: [u8; 1] = [0x01];
 
         let sig = hmac::sign(c, &data);
@@ -322,11 +449,15 @@ impl State {
     /// Derive chain key from previous chain key
     ///
     /// Note that this consumes the input chain key whereas `kdf_mk` does not.
-    fn kdf_ck(ck: [u8; 32]) -> [u8; 32] {
+    fn kdf_ck(ck: [u8; 32]) -> ([u8; 32], [u8; 32]) {
+
+        let mk = State::kdf_mk(&ck);
+
         // TODO: HKDF_HASH should probably be a static
         let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
         let c: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &ck);
 
+        // TODO: is this correct?
         let data: [u8; 1] = [0x02];
 
         let sig = hmac::sign(c, &data);
@@ -334,7 +465,7 @@ impl State {
         let mut ck = [0; 32];
         ck.copy_from_slice(sig.as_ref());
 
-        ck
+        (ck, mk)
     }
 }
 
@@ -374,7 +505,7 @@ mod test {
             dh_bob_priv.public_key(),
         ).unwrap();
 
-        let ratchet_bob = Ratchet::init_recieving(
+        let ratchet_bob = Ratchet::init_receiving(
             bob_ident_priv,
             bob_one_time_priv,
             &alice_ident_pub,
@@ -394,8 +525,20 @@ mod test {
         assert_eq!(ratchet_alice.state.root_key, ratchet_bob.state.root_key);
         assert_eq!(
             ratchet_alice.state.chain_key_sending,
-            ratchet_bob.state.chain_key_recieve
+            ratchet_bob.state.chain_key_receive
         );
+    }
+
+    // Check that ratchet states are consistent after advancing chain key
+    #[test]
+    fn advance_chain_key() {
+
+        let (mut ratchet_alice, mut ratchet_bob) = generate_ratchets();
+
+        assert_eq!(ratchet_alice.state.root_key, ratchet_bob.state.root_key);
+
+        ratchet_alice.encrypt(Vec::new());
+        assert_eq!(ratchet_alice.state.root_key, ratchet_bob.state.root_key);
     }
 
 }

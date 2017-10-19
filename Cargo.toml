@@ -9,6 +9,8 @@ error-chain = "0.10.0"
 rand = "0.3.16"
 ring = "0.9.7"
 untrusted = "0.5.1"
+serde = "1.0.9"
+serde_derive = "1.0.9"
 
 [dependencies.ruma-identifiers]
 git = "https://github.com/jplatte/ruma-identifiers"
