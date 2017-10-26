@@ -285,20 +285,17 @@ impl State {
         self.dh_remote = Some(header.dh_key.clone());
 
         // Ratchet to get new receiving chain
-        let (rk, ckr) = self.kdf_rk(State::ecdh(
-            self.dh_self.expect("Should be generated already"),
-            &self.dh_remote.expect("Set value to Some above").clone(),
-        )?);
+        let dh_out = self.ecdh()?;
+        let (rk, ckr) = State::kdf_rk(self.root_key, dh_out);
         self.root_key = rk;
         self.chain_key_receive = Some(ckr);
 
+        // Generate new DH key
         self.dh_self = Some(one_time_key::Curve25519Priv::generate_unrandom()?);
 
         // Ratchet to get new sending chain
-        let (rk, cks) = self.kdf_rk(State::ecdh(
-            self.dh_self.expect("Set value to Some above"),
-            &self.dh_remote.expect("Set value to Some above").clone(),
-        )?);
+        let dh_out = self.ecdh()?;
+        let (rk, cks) = State::kdf_rk(self.root_key, dh_out);
         self.root_key = rk;
         self.chain_key_sending = Some(cks);
 
@@ -306,10 +303,10 @@ impl State {
     }
 
     /// Advance the root key and return the new root key and chain key
-    fn kdf_rk(&mut self, dh_out: Vec<u8>) -> ([u8; 32], [u8; 32]) {
+    fn kdf_rk(rk: [u8; 32], dh_out: Vec<u8>) -> ([u8; 32], [u8; 32]) {
         // TODO: HKDF_HASH should probably be a static
         let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
-        let salt: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &self.root_key);
+        let salt: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &rk);
 
         let mut secret: [u8; 512] = [0; 512];
         hkdf::extract_and_expand(salt, &dh_out, b"OLM_RATCHET", &mut secret);
@@ -323,10 +320,16 @@ impl State {
         (root, chain)
     }
 
-    fn ecdh(
-        dh_self: &one_time_key::Curve25519Priv,
-        dh_remote: &one_time_key::Curve25519Pub,
-    ) -> Result<Vec<u8>> {
+    fn ecdh(&mut self) -> Result<Vec<u8>> {
+        // Take the DH keys so that can use them
+        let dh_self = self.dh_self.take().expect(
+            "Should always have own private key",
+        );
+        let dh_remote = self.dh_remote.take().expect(
+            "Should always have remote public key",
+        );
+
+        //("asdf").private_key(),
         let mut secret = agreement::agree_ephemeral(
             dh_self.private_key(),
             &agreement::X25519,
@@ -334,6 +337,11 @@ impl State {
             ring::error::Unspecified,
             |s| Ok(s.to_vec()),
         ).chain_err(|| "Agreement error")?;
+
+        // Replace the original DH keys
+        // FIXME There must be a better way to do this
+        self.dh_self = Some(dh_self);
+        self.dh_remote = Some(dh_remote);
 
         Ok(secret)
     }
