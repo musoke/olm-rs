@@ -8,15 +8,14 @@ base64 = "0.6.0"
 error-chain = "0.10.0"
 rand = "0.3.16"
 ring = "0.9.7"
-untrusted = "0.5.1"
+rust-crypto = "0.2.36"
 serde = "1.0.9"
 serde_derive = "1.0.9"
+untrusted = "0.5.1"
 
 [dependencies.ruma-identifiers]
-git = "https://github.com/jplatte/ruma-identifiers"
 branch = "synapse-workarounds"
-
-
+git = "https://github.com/jplatte/ruma-identifiers"
 
 [dev-dependencies]
 futures = "0.1.14"
@@ -24,9 +23,9 @@ tokio-core = "0.1.8"
 url = "1.5.1"
 
 [dev-dependencies.ruma-client]
-git = "https://github.com/musoke/ruma-client"
 branch = "unstable-e2e"
+git = "https://github.com/musoke/ruma-client"
 
 [dev-dependencies.ruma-events]
-git = "https://github.com/jplatte/ruma-events"
 branch = "synapse-workarounds"
+git = "https://github.com/jplatte/ruma-events"

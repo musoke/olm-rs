@@ -108,10 +108,10 @@ impl Ratchet {
         })
     }
 
-    pub fn encrypt(&mut self, plaintext: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)> {
-        let (chain_index, dh_pub, ciphertext) = self.state.state_encrypt(plaintext)?;
+    pub fn encrypt(&mut self, plaintext: Vec<u8>) -> Result<Vec<u8>> {
+        let ciphertext = self.state.state_encrypt(plaintext)?;
 
-        unimplemented!()
+        Ok(ciphertext)
     }
 
     pub fn decrypt(&mut self, header: MessageHeader, ciphertext: Vec<u8>) -> Result<Vec<u8>> {
@@ -308,7 +308,7 @@ impl State {
         let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
         let salt: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &rk);
 
-        let mut secret: [u8; 512] = [0; 512];
+        let mut secret: [u8; 64] = [0; 64];
         hkdf::extract_and_expand(salt, &dh_out, b"OLM_RATCHET", &mut secret);
 
         let mut root: [u8; 32] = [0; 32];
@@ -346,21 +346,36 @@ impl State {
         Ok(secret)
     }
 
-    pub fn state_encrypt(
-        &mut self,
-        plaintext: Vec<u8>,
-    ) -> Result<(usize, one_time_key::Curve25519Pub, Vec<u8>)> {
-
+    pub fn state_encrypt(&mut self, plaintext: Vec<u8>) -> Result<Vec<u8>> {
         let (ck, mk) = State::kdf_ck(self.chain_key_sending.expect("Should have a sending chain"));
         self.chain_key_sending = Some(ck);
 
         self.n_sending += 1;
 
-        let ciphertext = State::encrypt(mk, &plaintext).chain_err(
-            || "Failed to encrypt message",
-        )?;
+        let (aes_key, hmac_key, aes_iv) = State::derive_aead_keys(mk);
 
-        unimplemented!()
+        let ciphertext = State::encrypt(aes_key, aes_iv, &plaintext);
+
+
+        let header = MessageHeader {
+            dh_key: self.dh_self_public().unwrap(),
+            n_previous: self.n_previous,
+            n: self.n_sending,
+        };
+
+        // FIXME: do HMAC
+
+        Ok(ciphertext)
+
+    }
+
+    fn dh_self_public(&mut self) -> Option<one_time_key::Curve25519Pub> {
+        // TODO: this is a hack?
+        let private = self.dh_self.take().unwrap();
+        let public = private.public_key();
+        self.dh_self = Some(private);
+
+        Some(public)
     }
 
     pub fn state_decrypt(&mut self, header: MessageHeader, ciphertext: Vec<u8>) -> Result<Vec<u8>> {
@@ -429,19 +444,65 @@ impl State {
         }
     }
 
-    fn encrypt(mk: [u8; 32], plaintext: &Vec<u8>) -> Result<Vec<u8>> {
-        unimplemented!()
+    fn encrypt(aes_key: [u8; 32], aes_iv: [u8; 16], plaintext: &Vec<u8>) -> Vec<u8> {
+
+        use crypto;
+        use crypto::aes;
+
+        let mut ciphertext = Vec::<u8>::new();
+
+        {
+            let mut input = crypto::buffer::RefReadBuffer::new(plaintext);
+            let mut output = crypto::buffer::RefWriteBuffer::new(&mut ciphertext);
+
+            // let aes_key;
+            // let hmac_key;
+            // let aes_iv;
+
+            let mut encryptor = aes::cbc_encryptor(
+                aes::KeySize::KeySize256,
+                &aes_key,
+                &aes_iv,
+                crypto::blockmodes::PkcsPadding,
+            );
+
+            // TODO check if eof = true is correct
+            encryptor.encrypt(&mut input, &mut output, true).unwrap();
+
+        }
+
+        ciphertext
     }
 
     fn decrypt(mk: [u8; 32], ciphertext: &Vec<u8>, header: &MessageHeader) -> Result<Vec<u8>> {
         unimplemented!()
     }
 
-    /// Derive message key from chain key
-    fn kdf_mk(ck: &[u8; 32]) -> [u8; 32] {
+    /// Derive AES-256 CBC and HMAC-SHA-256 keys and IV from a message key
+    fn derive_aead_keys(mk: [u8; 32]) -> ([u8; 32], [u8; 32], [u8; 16]) {
         // TODO: HKDF_HASH should probably be a static
         let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
-        let c: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, ck);
+        let salt: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &[0]);
+
+        let mut secret: [u8; 80] = [0; 80];
+        hkdf::extract_and_expand(salt, &mk, b"OLM_KEYS", &mut secret);
+
+        let mut aes_key: [u8; 32] = [0; 32];
+        let mut hmac_key: [u8; 32] = [0; 32];
+        let mut aes_iv: [u8; 16] = [0; 16];
+
+        aes_key.copy_from_slice(&secret[0..32]);
+        hmac_key.copy_from_slice(&secret[32..64]);
+        aes_iv.copy_from_slice(&secret[64..80]);
+
+        (aes_key, hmac_key, aes_iv)
+    }
+
+    /// Derive message key from chain key
+    fn kdf_mk(ck: &[u8; 32]) -> [u8; 32] {
+        // TODO: HMAC_HASH should probably be a static
+        let hmac_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
+        let c: &ring::hmac::SigningKey = &hmac::SigningKey::new(hmac_hash, ck);
 
         // TODO: is this correct?
         let data: [u8; 1] = [0x01];
@@ -461,9 +522,9 @@ impl State {
 
         let mk = State::kdf_mk(&ck);
 
-        // TODO: HKDF_HASH should probably be a static
-        let hkdf_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
-        let c: &ring::hmac::SigningKey = &hmac::SigningKey::new(hkdf_hash, &ck);
+        // TODO: HMAC_HASH should probably be a static
+        let hmac_hash: &ring::digest::Algorithm = &ring::digest::SHA256;
+        let c: &ring::hmac::SigningKey = &hmac::SigningKey::new(hmac_hash, &ck);
 
         // TODO: is this correct?
         let data: [u8; 1] = [0x02];
@@ -537,16 +598,27 @@ mod test {
         );
     }
 
-    // Check that ratchet states are consistent after advancing chain key
+    // Check that ratchet states are consistent when advancing chain key
     #[test]
     fn advance_chain_key() {
 
         let (mut ratchet_alice, mut ratchet_bob) = generate_ratchets();
 
         assert_eq!(ratchet_alice.state.root_key, ratchet_bob.state.root_key);
+        assert_eq!(
+            ratchet_alice.state.chain_key_sending,
+            ratchet_bob.state.chain_key_receive
+        );
 
-        ratchet_alice.encrypt(Vec::new());
+        let ciphertext = ratchet_alice.encrypt(Vec::new());
+
+        // Root key shouldn't have changed
         assert_eq!(ratchet_alice.state.root_key, ratchet_bob.state.root_key);
+        // Chain keys should be different until bob decrypts
+        assert_ne!(
+            ratchet_alice.state.chain_key_sending,
+            ratchet_bob.state.chain_key_receive
+        );
     }
 
 }

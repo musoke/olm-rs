@@ -32,6 +32,8 @@ applies a HKDF with a different info (`OLM_ROOT` instead of `OLM_RATCHET`).
     This is good enough for simple compatibility testing, but obviously
     horribly insceure for actual use.
 
+  - Better implementation of encryption.
+    `ring` does not yet have AES-CBC with HMAC-SHA256, so I've cobbled it together from `rust-crypto`.
 
 # Warning
 

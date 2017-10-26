@@ -19,6 +19,7 @@ pub use errors::*;
 extern crate base64;
 extern crate rand;
 extern crate ring;
+extern crate crypto;
 extern crate untrusted;
 extern crate serde;
 #[macro_use]
