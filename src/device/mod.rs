@@ -78,7 +78,7 @@ impl<'a> LocalDevice {
             user_id: user_id,
             device_id: device_id,
             signing_key_pair: signing_key::Ed25519Pair::generate()?,
-            ident_key_priv: identity_key::Curve25519Priv::generate()?,
+            ident_key_priv: identity_key::Curve25519Priv::generate_unrandom()?,
             one_time_key_pairs: one_time_key::Store::generate()?,
             ratchets: ratchet::Store::new(),
         })
