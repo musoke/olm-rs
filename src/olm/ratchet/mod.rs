@@ -7,6 +7,8 @@ use olm::{identity_key, one_time_key};
 use olm::one_time_key::{OneTimeKey, OneTimeKeyPriv};
 use olm::identity_key::{IdentityKey, IdentityKeyPriv};
 
+use crypto::buffer::{ReadBuffer, WriteBuffer, BufferResult};
+
 
 pub struct Store {
     hashmap: HashMap<RatchetId, Ratchet>,
@@ -108,16 +110,16 @@ impl Ratchet {
         })
     }
 
-    pub fn encrypt(&mut self, plaintext: Vec<u8>) -> Result<Vec<u8>> {
-        let ciphertext = self.state.state_encrypt(plaintext)?;
+    pub fn encrypt(&mut self, plaintext: &Vec<u8>) -> Result<(MessageHeader, Vec<u8>)> {
+        let (header, ciphertext) = self.state.state_encrypt(plaintext)?;
 
-        Ok(ciphertext)
+        Ok((header, ciphertext))
     }
 
-    pub fn decrypt(&mut self, header: MessageHeader, ciphertext: Vec<u8>) -> Result<Vec<u8>> {
+    pub fn decrypt(&mut self, header: MessageHeader, ciphertext: &Vec<u8>) -> Result<Vec<u8>> {
         let plaintext = self.state.state_decrypt(header, ciphertext)?;
 
-        unimplemented!()
+        Ok(plaintext)
     }
 }
 
@@ -346,7 +348,7 @@ impl State {
         Ok(secret)
     }
 
-    pub fn state_encrypt(&mut self, plaintext: Vec<u8>) -> Result<Vec<u8>> {
+    pub fn state_encrypt(&mut self, plaintext: &Vec<u8>) -> Result<(MessageHeader, Vec<u8>)> {
         let (ck, mk) = State::kdf_ck(self.chain_key_sending.expect("Should have a sending chain"));
         self.chain_key_sending = Some(ck);
 
@@ -354,7 +356,7 @@ impl State {
 
         let (aes_key, hmac_key, aes_iv) = State::derive_aead_keys(mk);
 
-        let ciphertext = State::encrypt(aes_key, aes_iv, &plaintext);
+        let ciphertext = State::encrypt(aes_key, aes_iv, plaintext)?;
 
 
         let header = MessageHeader {
@@ -365,8 +367,9 @@ impl State {
 
         // FIXME: do HMAC
 
-        Ok(ciphertext)
+        // FIXME: do message format
 
+        Ok((header, ciphertext))
     }
 
     fn dh_self_public(&mut self) -> Option<one_time_key::Curve25519Pub> {
@@ -378,7 +381,11 @@ impl State {
         Some(public)
     }
 
-    pub fn state_decrypt(&mut self, header: MessageHeader, ciphertext: Vec<u8>) -> Result<Vec<u8>> {
+    pub fn state_decrypt(
+        &mut self,
+        header: MessageHeader,
+        ciphertext: &Vec<u8>,
+    ) -> Result<Vec<u8>> {
         if let Some(plaintext) = self.try_skipped_message_keys(&header, &ciphertext)? {
             Ok(plaintext)
         } else {
@@ -399,7 +406,7 @@ impl State {
             self.chain_key_receive = Some(ckr);
             self.n_receive += 1;
 
-            State::decrypt(mk, &ciphertext, &header).chain_err(|| "Failed to decrypt message")
+            State::decrypt_and_auth(mk, &ciphertext).chain_err(|| "Failed to decrypt message")
         }
     }
 
@@ -412,7 +419,7 @@ impl State {
         // confirm.
         // TODO is there a way around cloning dh_key?
         if let Some(mk) = self.mk_skipped.remove(&(header.dh_key.clone(), header.n)) {
-            Ok(Some(State::decrypt(mk, ciphertext, (header)).chain_err(
+            Ok(Some(State::decrypt_and_auth(mk, ciphertext).chain_err(
                 || "Failed to decrypt skipped message",
             )?))
         } else {
@@ -444,38 +451,101 @@ impl State {
         }
     }
 
-    fn encrypt(aes_key: [u8; 32], aes_iv: [u8; 16], plaintext: &Vec<u8>) -> Vec<u8> {
+    fn encrypt(aes_key: [u8; 32], aes_iv: [u8; 16], plaintext: &Vec<u8>) -> Result<Vec<u8>> {
 
         use crypto;
         use crypto::aes;
 
+        println!("aes_key: {:?}", aes_key);
+        println!("aes_iv: {:?}", aes_iv);
+
+        let mut encryptor = aes::cbc_encryptor(
+            aes::KeySize::KeySize256,
+            &aes_key,
+            &aes_iv,
+            crypto::blockmodes::PkcsPadding,
+        );
+
         let mut ciphertext = Vec::<u8>::new();
+        let mut read_buffer = crypto::buffer::RefReadBuffer::new(plaintext);
+        let mut buffer = [0; 4096];
+        let mut write_buffer = crypto::buffer::RefWriteBuffer::new(&mut buffer);
 
-        {
-            let mut input = crypto::buffer::RefReadBuffer::new(plaintext);
-            let mut output = crypto::buffer::RefWriteBuffer::new(&mut ciphertext);
+        loop {
 
-            // let aes_key;
-            // let hmac_key;
-            // let aes_iv;
+            let result = encryptor
+                .encrypt(&mut read_buffer, &mut write_buffer, true)
+                .expect("Can encrypt to buffer");
 
-            let mut encryptor = aes::cbc_encryptor(
-                aes::KeySize::KeySize256,
-                &aes_key,
-                &aes_iv,
-                crypto::blockmodes::PkcsPadding,
+            ciphertext.extend(
+                write_buffer
+                    .take_read_buffer()
+                    .take_remaining()
+                    .iter()
+                    .map(|&i| i),
             );
 
-            // TODO check if eof = true is correct
-            encryptor.encrypt(&mut input, &mut output, true).unwrap();
-
+            match result {
+                BufferResult::BufferUnderflow => break,
+                BufferResult::BufferOverflow => {}
+            }
         }
 
-        ciphertext
+        Ok(ciphertext)
     }
 
-    fn decrypt(mk: [u8; 32], ciphertext: &Vec<u8>, header: &MessageHeader) -> Result<Vec<u8>> {
-        unimplemented!()
+    fn decrypt_and_auth(mk: [u8; 32], ciphertext: &Vec<u8>) -> Result<Vec<u8>> {
+
+        let (aes_key, hmac_key, aes_iv) = State::derive_aead_keys(mk);
+
+        // FIXME: HMAC auth
+
+        let plaintext = State::decrypt(aes_key, aes_iv, ciphertext)?;
+
+        Ok(plaintext)
+    }
+
+    fn decrypt(aes_key: [u8; 32], aes_iv: [u8; 16], ciphertext: &Vec<u8>) -> Result<Vec<u8>> {
+
+        println!("aes_key: {:?}", aes_key);
+        println!("aes_iv: {:?}", aes_iv);
+
+        use crypto;
+        use crypto::aes;
+
+        let mut decryptor = aes::cbc_decryptor(
+            aes::KeySize::KeySize256,
+            &aes_key,
+            &aes_iv,
+            crypto::blockmodes::PkcsPadding,
+        );
+
+        let mut plaintext = Vec::<u8>::new();
+        let mut read_buffer = crypto::buffer::RefReadBuffer::new(ciphertext);
+        let mut buffer = [0; 4096];
+        let mut write_buffer = crypto::buffer::RefWriteBuffer::new(&mut buffer);
+
+        loop {
+
+            let result = decryptor
+                .decrypt(&mut read_buffer, &mut write_buffer, true)
+                .expect("Can decrypt to buffer");
+
+            plaintext.extend(
+                write_buffer
+                    .take_read_buffer()
+                    .take_remaining()
+                    .iter()
+                    .map(|&i| i),
+            );
+
+            match result {
+                BufferResult::BufferUnderflow => break,
+                BufferResult::BufferOverflow => {}
+            }
+        }
+
+        Ok(plaintext)
     }
 
     /// Derive AES-256 CBC and HMAC-SHA-256 keys and IV from a message key
@@ -600,7 +670,7 @@ mod test {
 
     // Check that ratchet states are consistent when advancing chain key
     #[test]
-    fn advance_chain_key() {
+    fn simple_encrypt_decrypt() {
 
         let (mut ratchet_alice, mut ratchet_bob) = generate_ratchets();
 
@@ -610,7 +680,11 @@ mod test {
             ratchet_bob.state.chain_key_receive
         );
 
-        let ciphertext = ratchet_alice.encrypt(Vec::new());
+        let plain_alice = vec![0, 1, 2];
+
+        let (header, ciphertext) = ratchet_alice.encrypt(&plain_alice).expect(
+            "Can encrypt the message",
+        );
 
         // Root key shouldn't have changed
         assert_eq!(ratchet_alice.state.root_key, ratchet_bob.state.root_key);
@@ -619,6 +693,25 @@ mod test {
             ratchet_alice.state.chain_key_sending,
             ratchet_bob.state.chain_key_receive
         );
+        assert_ne!(ciphertext.len(), 0);
+
+        println!("ciphertext bytes: {:?}", ciphertext);
+        println!("ciphertext length: {:?}", ciphertext.len());
+
+        let plain_bob = ratchet_bob.decrypt(header, &ciphertext).expect(
+            "Can decrypt the message",
+        );
+
+        // Bob's root key should have advanced
+        assert_ne!(ratchet_alice.state.root_key, ratchet_bob.state.root_key);
+        // Should get matching plaintext
+        assert_eq!(plain_alice, plain_bob);
+        // Chain keys should be the same now
+        // assert_eq!(
+        //     ratchet_alice.state.chain_key_sending,
+        //     ratchet_bob.state.chain_key_receive
+        // );
+
     }
 
 }
