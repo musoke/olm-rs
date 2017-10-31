@@ -61,6 +61,7 @@ struct State {
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 struct MessageHeader {
     pub dh_key: one_time_key::Curve25519Pub,
     pub n_previous: usize,
@@ -74,12 +75,10 @@ impl Ratchet {
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: &identity_key::Curve25519Pub,
         one_time_bob: one_time_key::Curve25519Pub,
-        dh_bob: one_time_key::Curve25519Pub,
     ) -> Result<Self> {
 
-        let state =
-            State::init_sending(ident_alice, one_time_alice, ident_bob, one_time_bob, dh_bob)
-                .chain_err(|| "Failed to initialize ratchet for sending")?;
+        let state = State::init_sending(ident_alice, one_time_alice, ident_bob, one_time_bob)
+            .chain_err(|| "Failed to initialize ratchet for sending")?;
 
         Ok(Ratchet {
             id: RatchetId {},
@@ -95,12 +94,10 @@ impl Ratchet {
         one_time_bob: one_time_key::Curve25519Priv,
         ident_alice: &identity_key::Curve25519Pub,
         one_time_alice: one_time_key::Curve25519Pub,
-        dh_bob: one_time_key::Curve25519Priv,
     ) -> Result<Self> {
 
-        let state =
-            State::init_receiving(ident_bob, one_time_bob, ident_alice, one_time_alice, dh_bob)
-                .chain_err(|| "Failed to initialize ratchet for receiving")?;
+        let state = State::init_receiving(ident_bob, one_time_bob, ident_alice, one_time_alice)
+            .chain_err(|| "Failed to initialize ratchet for receiving")?;
 
         Ok(Ratchet {
             id: RatchetId {},
@@ -121,6 +118,16 @@ impl Ratchet {
 
         Ok(plaintext)
     }
+
+    pub fn decrypt_first_message(
+        &mut self,
+        header: MessageHeader,
+        ciphertext: &Vec<u8>,
+    ) -> Result<Vec<u8>> {
+        let plaintext = self.state.decrypt_first_message(header, ciphertext)?;
+
+        Ok(plaintext)
+    }
 }
 
 impl State {
@@ -135,13 +142,11 @@ impl State {
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: &identity_key::Curve25519Pub,
         one_time_bob: one_time_key::Curve25519Pub,
-        dh_bob: one_time_key::Curve25519Pub,
     ) -> Result<Self> {
         let mut state: State = Default::default();
 
         let dh_self_priv = one_time_key::Curve25519Priv::generate_unrandom()?;
         state.dh_self = Some(dh_self_priv);
-        state.dh_remote = Some(dh_bob);
 
         let shared_secret =
             State::x3dh_local(ident_alice, one_time_alice, ident_bob, one_time_bob)?;
@@ -159,11 +164,8 @@ impl State {
         one_time_bob: one_time_key::Curve25519Priv,
         ident_alice: &identity_key::Curve25519Pub,
         one_time_alice: one_time_key::Curve25519Pub,
-        dh_bob: one_time_key::Curve25519Priv,
     ) -> Result<Self> {
         let mut state: State = Default::default();
-
-        state.dh_self = Some(dh_bob);
 
         let shared_secret =
             State::x3dh_remote(ident_bob, one_time_bob, ident_alice, one_time_alice)?;
@@ -399,7 +401,7 @@ impl State {
                 }
             }
 
-            self.skip_message_keys(header.n)?;
+            self.skip_message_keys(header.n - 1)?;
 
             let (ckr, mk) =
                 State::kdf_ck(self.chain_key_receive.expect("Should have a sending chain"));
@@ -449,6 +451,29 @@ impl State {
         } else {
             Ok(())
         }
+    }
+
+    pub fn decrypt_first_message(
+        &mut self,
+        header: MessageHeader,
+        ciphertext: &Vec<u8>,
+    ) -> Result<Vec<u8>> {
+        // Set remote DH key
+        self.dh_remote = Some(header.dh_key.clone());
+
+        // Create local DH key
+        self.dh_self = Some(one_time_key::Curve25519Priv::generate_unrandom()?);
+
+        // Ratchet to get new sending chain
+        let dh_out = self.ecdh()?;
+        let (rk, cks) = State::kdf_rk(self.root_key, dh_out);
+        self.root_key = rk;
+        self.chain_key_sending = Some(cks);
+
+        // Decrypt the message
+        let plaintext = self.state_decrypt(header, ciphertext)?;
+
+        Ok(plaintext)
     }
 
     fn encrypt(aes_key: [u8; 32], aes_iv: [u8; 16], plaintext: &Vec<u8>) -> Result<Vec<u8>> {
@@ -634,14 +659,11 @@ mod test {
         let bob_one_time_priv = one_time_key::Curve25519Priv::generate_unrandom().unwrap();
         let bob_one_time_pub = bob_one_time_priv.public_key();
 
-        let dh_bob_priv = one_time_key::Curve25519Priv::generate_unrandom().unwrap();
-
         let ratchet_alice = Ratchet::init_sending(
             alice_ident_priv,
             alice_one_time_priv,
             &bob_ident_pub,
             bob_one_time_pub,
-            dh_bob_priv.public_key(),
         ).unwrap();
 
         let ratchet_bob = Ratchet::init_receiving(
@@ -649,7 +671,6 @@ mod test {
             bob_one_time_priv,
             &alice_ident_pub,
             alice_one_time_pub,
-            dh_bob_priv,
         ).unwrap();
 
         (ratchet_alice, ratchet_bob)
@@ -698,19 +719,27 @@ mod test {
         println!("ciphertext bytes: {:?}", ciphertext);
         println!("ciphertext length: {:?}", ciphertext.len());
 
-        let plain_bob = ratchet_bob.decrypt(header, &ciphertext).expect(
-            "Can decrypt the message",
+        let plain_bob = ratchet_bob
+            .decrypt_first_message(header, &ciphertext)
+            .expect("Can decrypt the message");
+
+        // Alice's public DH key should match that of Bob
+        assert_eq!(
+            ratchet_alice.state.dh_self.unwrap().public_key(),
+            ratchet_bob.state.dh_remote.unwrap()
         );
 
         // Bob's root key should have advanced
         assert_ne!(ratchet_alice.state.root_key, ratchet_bob.state.root_key);
+
         // Should get matching plaintext
         assert_eq!(plain_alice, plain_bob);
+
         // Chain keys should be the same now
-        // assert_eq!(
-        //     ratchet_alice.state.chain_key_sending,
-        //     ratchet_bob.state.chain_key_receive
-        // );
+        assert_eq!(
+            ratchet_alice.state.chain_key_sending,
+            ratchet_bob.state.chain_key_receive
+        );
 
     }
 
