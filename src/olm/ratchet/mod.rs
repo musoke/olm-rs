@@ -459,6 +459,11 @@ impl State {
         header: MessageHeader,
         ciphertext: &Vec<u8>,
     ) -> Result<Vec<u8>> {
+
+        if self.dh_remote.is_some() {
+            panic!("remote dh key already set");
+        }
+
         // Set remote DH key
         self.dh_remote = Some(header.dh_key.clone());
 
@@ -770,7 +775,7 @@ mod test {
 
     // Check decrypting multiple in order messages
     #[test]
-    fn encrypt_2() {
+    fn encrypt_decrypt_3() {
 
         let (keys_alice, keys_bob) = generate_keys();
 
@@ -921,6 +926,46 @@ mod test {
             "Can decrypt message",
         );
         assert_eq!(plain_alice_1, plain_bob_1);
+
+    }
+
+    // Replying to messages
+    #[test]
+    fn reply() {
+
+        let (keys_alice, keys_bob) = generate_keys();
+
+        let mut ratchet_alice =
+            Ratchet::init_sending(keys_alice.0, keys_alice.1, &keys_alice.2, keys_alice.3)
+                .expect("Can generate Alice's ratchet");
+        let mut ratchet_bob =
+            Ratchet::init_receiving(keys_bob.0, keys_bob.1, &keys_bob.2, keys_bob.3)
+                .expect("Can generate Bob's ratchet");
+
+
+        let plain_alice_1 = vec![0, 1, 2];
+        let (header_1, ciphertext_1) = ratchet_alice.encrypt(&plain_alice_1).expect(
+            "Can encrypt the message",
+        );
+        assert_ne!(ciphertext_1.len(), 0);
+
+        // Decrypt 1st message
+        let plain_bob_1 = ratchet_bob
+            .decrypt_first_message(header_1, &ciphertext_1)
+            .expect("Can decrypt the first message");
+        assert_eq!(plain_alice_1, plain_bob_1);
+
+        let plain_bob_2 = vec![2, 1, 0];
+        let (header_2, ciphertext_2) = ratchet_bob.encrypt(&plain_bob_2).expect(
+            "Can encrypt the message",
+        );
+        assert_ne!(ciphertext_2.len(), 0);
+
+        // Decrypt reply
+        let plain_alice_2 = ratchet_alice.decrypt(header_2, &ciphertext_2).expect(
+            "Can decrypt the first message",
+        );
+        assert_eq!(plain_alice_2, plain_bob_2);
 
     }
 
