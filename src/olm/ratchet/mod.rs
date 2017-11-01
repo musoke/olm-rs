@@ -822,7 +822,7 @@ mod test {
 
     // Check decrypting multiple out of order messages
     #[test]
-    fn out_of_order() {
+    fn out_of_order_1_3_2() {
 
         let (keys_alice, keys_bob) = generate_keys();
 
@@ -846,8 +846,8 @@ mod test {
         );
         assert_ne!(ciphertext_1.len(), 0);
 
-        let plain_alice_3 = vec![0, 1, 2];
-        let (header_3, ciphertext_3) = ratchet_alice.encrypt(&plain_alice_1).expect(
+        let plain_alice_3 = vec![0, 1, 2, 3, 4];
+        let (header_3, ciphertext_3) = ratchet_alice.encrypt(&plain_alice_3).expect(
             "Can encrypt the message",
         );
         assert_ne!(ciphertext_1.len(), 0);
@@ -869,6 +869,58 @@ mod test {
             "Can decrypt message",
         );
         assert_eq!(plain_alice_2, plain_bob_2);
+
+    }
+
+    // Check decrypting multiple out of order messages
+    #[test]
+    fn out_of_order_3_2_1() {
+
+        let (keys_alice, keys_bob) = generate_keys();
+
+        let mut ratchet_alice =
+            Ratchet::init_sending(keys_alice.0, keys_alice.1, &keys_alice.2, keys_alice.3)
+                .expect("Can generate Alice's ratchet");
+        let mut ratchet_bob =
+            Ratchet::init_receiving(keys_bob.0, keys_bob.1, &keys_bob.2, keys_bob.3)
+                .expect("Can generate Bob's ratchet");
+
+
+        let plain_alice_1 = vec![0, 1, 2];
+        let (header_1, ciphertext_1) = ratchet_alice.encrypt(&plain_alice_1).expect(
+            "Can encrypt the message",
+        );
+        assert_ne!(ciphertext_1.len(), 0);
+
+        let plain_alice_2 = vec![0, 1, 2, 3];
+        let (header_2, ciphertext_2) = ratchet_alice.encrypt(&plain_alice_2).expect(
+            "Can encrypt the message",
+        );
+        assert_ne!(ciphertext_1.len(), 0);
+
+        let plain_alice_3 = vec![0, 1, 2, 3, 4];
+        let (header_3, ciphertext_3) = ratchet_alice.encrypt(&plain_alice_3).expect(
+            "Can encrypt the message",
+        );
+        assert_ne!(ciphertext_1.len(), 0);
+
+        // Decrypt 3rd message first
+        let plain_bob_3 = ratchet_bob
+            .decrypt_first_message(header_3, &ciphertext_3)
+            .expect("Can decrypt the first message");
+        assert_eq!(plain_alice_3, plain_bob_3);
+
+        // Decrypt 2nd message
+        let plain_bob_2 = ratchet_bob.decrypt(header_2, &ciphertext_2).expect(
+            "Can decrypt message",
+        );
+        assert_eq!(plain_alice_2, plain_bob_2);
+
+        // Decrypt 1st message
+        let plain_bob_1 = ratchet_bob.decrypt(header_1, &ciphertext_1).expect(
+            "Can decrypt message",
+        );
+        assert_eq!(plain_alice_1, plain_bob_1);
 
     }
 
