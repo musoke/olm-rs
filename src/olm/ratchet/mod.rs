@@ -404,27 +404,30 @@ impl State {
         header: MessageHeader,
         ciphertext: &Vec<u8>,
     ) -> Result<Vec<u8>> {
-        if let Some(plaintext) = self.try_skipped_message_keys(&header, &ciphertext)? {
-            Ok(plaintext)
-        } else {
-            match self.dh_remote {
-                // TODO this should only match when the two dh_keys are equal. Advancing the root
-                // key is broken until this is fixed.
-                Some(ref dh_receiving) => {}
-                None | Some(_) => {
-                    self.skip_message_keys(header.n_previous)?;
-                    self.dh_ratchet(&header);
-                }
+        match self.try_skipped_message_keys(&header, &ciphertext)? {
+            Some(plaintext) => {
+                Ok(plaintext)
             }
+            None => {
+                match self.dh_remote {
+                    Some(ref current_dh_key) if current_dh_key == &header.dh_key => {
+                        // Current root key is correct, don't advance
+                    }
+                    None | Some(_) => {
+                        self.skip_message_keys(header.n_previous)?;
+                        self.dh_ratchet(&header);
+                    }
+                }
 
-            self.skip_message_keys(header.n)?;
+                self.skip_message_keys(header.n)?;
 
-            let (ckr, mk) =
-                State::kdf_ck(self.chain_key_receive.expect("Should have a sending chain"));
-            self.chain_key_receive = Some(ckr);
-            self.n_receive += 1;
+                let (ckr, mk) =
+                    State::kdf_ck(self.chain_key_receive.expect("Should have a sending chain"));
+                self.chain_key_receive = Some(ckr);
+                self.n_receive += 1;
 
-            State::decrypt_and_auth(mk, &ciphertext).chain_err(|| "Failed to decrypt message")
+                State::decrypt_and_auth(mk, &ciphertext).chain_err(|| "Failed to decrypt message")
+            }
         }
     }
 
@@ -954,6 +957,61 @@ mod test {
             "Can decrypt the first message",
         );
         assert_eq!(plain_alice_2, plain_bob_2);
+
+    }
+
+    // Replying to messages
+    #[test]
+    fn reply_reply() {
+
+        let (keys_alice, keys_bob) = generate_keys();
+
+        let mut ratchet_alice =
+            Ratchet::init_sending(keys_alice.0, keys_alice.1, &keys_alice.2, keys_alice.3)
+                .expect("Can generate Alice's ratchet");
+
+        // First message
+        let plain_alice_1 = vec![0];
+        let (header_1, ciphertext_1) = ratchet_alice.encrypt(&plain_alice_1).expect(
+            "Can encrypt the message",
+        );
+        assert_ne!(ciphertext_1.len(), 0);
+
+        let mut ratchet_bob = Ratchet::init_receiving(
+            keys_bob.0,
+            keys_bob.1,
+            &keys_bob.2,
+            keys_bob.3,
+            header_1.clone(),
+            &ciphertext_1,
+        ).expect("Can generate Bob's ratchet");
+        let plain_bob_1 = ratchet_bob.decrypt(header_1, &ciphertext_1).expect(
+            "Can decrypt the first message",
+        );
+        assert_eq!(plain_alice_1, plain_bob_1);
+
+        // Reply
+        let plain_bob_2 = vec![1];
+        let (header_2, ciphertext_2) = ratchet_bob.encrypt(&plain_bob_2).expect(
+            "Can encrypt the message",
+        );
+        assert_ne!(ciphertext_2.len(), 0);
+        let plain_alice_2 = ratchet_alice.decrypt(header_2, &ciphertext_2).expect(
+            "Can decrypt the first message",
+        );
+        assert_eq!(plain_alice_2, plain_bob_2);
+
+        // Reply to reply
+        println!("Encrypt message #3");
+        let plain_alice_3 = vec![3];
+        let (header_3, ciphertext_3) = ratchet_alice.encrypt(&plain_alice_3).expect(
+            "Can encrypt the message",
+        );
+        println!("Decrypt message #3, header: {:?}", header_3);
+        let plain_bob_3 = ratchet_bob.decrypt(header_3, &ciphertext_3).expect(
+            "Can decrypt the first message",
+        );
+        // assert_eq!(plain_alice_3, plain_bob_3);
 
     }
 
