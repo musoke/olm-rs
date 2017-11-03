@@ -48,7 +48,6 @@ struct Ratchet {
 #[derive(Debug)]
 #[derive(Default)]
 struct State {
-    // TODO: Should not be a tuple once ring has non-ephemeral keys
     dh_self: Option<one_time_key::Curve25519Priv>,
     dh_remote: Option<one_time_key::Curve25519Pub>,
     root_key: [u8; 32],
@@ -98,14 +97,9 @@ impl Ratchet {
         ciphertext: &Vec<u8>,
     ) -> Result<Self> {
 
-        let state = State::init_receiving(
-            ident_bob,
-            one_time_bob,
-            ident_alice,
-            one_time_alice,
-            header,
-            ciphertext,
-        ).chain_err(|| "Failed to initialize ratchet for receiving")?;
+        let state =
+            State::init_receiving(ident_bob, one_time_bob, ident_alice, one_time_alice, header)
+                .chain_err(|| "Failed to initialize ratchet for receiving")?;
 
         // TODO: Check if decryptable and authentication is correct? If so, should discard the
         // one-time key in the calling function
@@ -166,7 +160,6 @@ impl State {
         ident_alice: &identity_key::Curve25519Pub,
         one_time_alice: one_time_key::Curve25519Pub,
         header: MessageHeader,
-        ciphertext: &Vec<u8>,
     ) -> Result<Self> {
         let mut state: State = Default::default();
 
@@ -348,14 +341,13 @@ impl State {
             "Should always have remote public key",
         );
 
-        //("asdf").private_key(),
-        let mut secret = agreement::agree_ephemeral(
+        let secret = agreement::agree_ephemeral(
             dh_self.private_key(),
             &agreement::X25519,
             dh_remote.public_key(),
             ring::error::Unspecified,
             |s| Ok(s.to_vec()),
-        ).chain_err(|| "Agreement error")?;
+        ).chain_err(|| "ECDH agreement error")?;
 
         // Replace the original DH keys
         // FIXME There must be a better way to do this
@@ -415,7 +407,7 @@ impl State {
                     }
                     None | Some(_) => {
                         self.skip_message_keys(header.n_previous)?;
-                        self.dh_ratchet(&header);
+                        self.dh_ratchet(&header)?;
                     }
                 }
 
@@ -450,7 +442,7 @@ impl State {
 
     fn skip_message_keys(&mut self, until: usize) -> Result<()> {
         if self.n_receive + State::MAX_SKIP < until {
-            // Error::from("sdf")
+            // Error::from("To many skipped messages")
             unimplemented!()
         } else if self.chain_key_receive.is_some() {
             while self.n_receive < until {
@@ -1011,7 +1003,7 @@ mod test {
         let plain_bob_3 = ratchet_bob.decrypt(header_3, &ciphertext_3).expect(
             "Can decrypt the first message",
         );
-        // assert_eq!(plain_alice_3, plain_bob_3);
+        assert_eq!(plain_alice_3, plain_bob_3);
 
     }
 
