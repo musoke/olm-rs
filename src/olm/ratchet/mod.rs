@@ -398,14 +398,20 @@ impl State {
     ) -> Result<Vec<u8>> {
         match self.try_skipped_message_keys(&header, &ciphertext)? {
             Some(plaintext) => {
+                debug!("Matched skipped message key");
                 Ok(plaintext)
             }
             None => {
+                debug!("Did not match skipped message keys");
+
                 match self.dh_remote {
                     Some(ref current_dh_key) if current_dh_key == &header.dh_key => {
                         // Current root key is correct, don't advance
+                        debug!("Keeping current root key");
                     }
                     None | Some(_) => {
+                        debug!("Advancing root key to decrypt");
+
                         self.skip_message_keys(header.n_previous)?;
                         self.dh_ratchet(&header)?;
                     }
@@ -428,12 +434,17 @@ impl State {
         header: &MessageHeader,
         ciphertext: &Vec<u8>,
     ) -> Result<Option<Vec<u8>>> {
+        debug!("Trying skipped message keys");
+
+        debug!("mk_skipped: {:?}", self.mk_skipped.keys());
+        debug!("header of desired message: {:?}", header);
+
         // TODO Note that this consumes the mk. I think this is the correct behaviour, but should
         // confirm.
         // TODO is there a way around cloning dh_key?
         if let Some(mk) = self.mk_skipped.remove(&(header.dh_key.clone(), header.n)) {
             Ok(Some(State::decrypt_and_auth(mk, ciphertext).chain_err(
-                || "Failed to decrypt skipped message",
+                || "Failed to decrypt skipped message; key deleted",
             )?))
         } else {
             Ok(None)
@@ -441,6 +452,13 @@ impl State {
     }
 
     fn skip_message_keys(&mut self, until: usize) -> Result<()> {
+
+        debug!(
+            "Skipping message keys from {} up to {}",
+            self.n_receive,
+            until
+        );
+
         if self.n_receive + State::MAX_SKIP < until {
             Err(ErrorKind::SkippedMessageOverflow.into())
         } else if self.chain_key_receive.is_some() {
@@ -469,8 +487,8 @@ impl State {
         use crypto;
         use crypto::aes;
 
-        println!("aes_key: {:?}", aes_key);
-        println!("aes_iv: {:?}", aes_iv);
+        debug!("aes_key: {:?}", aes_key);
+        debug!("aes_iv: {:?}", aes_iv);
 
         let mut encryptor = aes::cbc_encryptor(
             aes::KeySize::KeySize256,
@@ -520,8 +538,8 @@ impl State {
 
     fn decrypt(aes_key: [u8; 32], aes_iv: [u8; 16], ciphertext: &Vec<u8>) -> Result<Vec<u8>> {
 
-        println!("aes_key: {:?}", aes_key);
-        println!("aes_iv: {:?}", aes_iv);
+        debug!("aes_key: {:?}", aes_key);
+        debug!("aes_iv: {:?}", aes_iv);
 
         use crypto;
         use crypto::aes;
@@ -648,6 +666,10 @@ mod test {
              one_time_key::Curve25519Pub))
     {
 
+        ::env_logger::LogBuilder::new()
+            .target(::env_logger::LogTarget::Stdout)
+            .init();
+
         let alice_ident_priv = identity_key::Curve25519Priv::generate_unrandom().unwrap();
         let alice_ident_pub = alice_ident_priv.public_key();
         let bob_ident_priv = identity_key::Curve25519Priv::generate_unrandom().unwrap();
@@ -689,6 +711,7 @@ mod test {
         let (header, ciphertext) = ratchet_alice.encrypt(&plain_alice).expect(
             "Can encrypt the message",
         );
+        debug!("header: {:?}", header);
 
         let mut ratchet_bob = Ratchet::init_receiving(
             keys_bob.0,
@@ -708,8 +731,8 @@ mod test {
         );
         assert_ne!(ciphertext.len(), 0);
 
-        println!("ciphertext bytes: {:?}", ciphertext);
-        println!("ciphertext length: {:?}", ciphertext.len());
+        debug!("ciphertext bytes: {:?}", ciphertext);
+        debug!("ciphertext length: {:?}", ciphertext.len());
 
         let plain_bob = ratchet_bob.decrypt(header, &ciphertext).expect(
             "Can decrypt the message",
@@ -993,12 +1016,12 @@ mod test {
         assert_eq!(plain_alice_2, plain_bob_2);
 
         // Reply to reply
-        println!("Encrypt message #3");
+        debug!("Encrypt message #3");
         let plain_alice_3 = vec![3];
         let (header_3, ciphertext_3) = ratchet_alice.encrypt(&plain_alice_3).expect(
             "Can encrypt the message",
         );
-        println!("Decrypt message #3, header: {:?}", header_3);
+        debug!("Decrypt message #3, header: {:?}", header_3);
         let plain_bob_3 = ratchet_bob.decrypt(header_3, &ciphertext_3).expect(
             "Can decrypt the first message",
         );

@@ -16,6 +16,11 @@ mod errors {
 
 pub use errors::*;
 
+#[macro_use]
+extern crate log;
+#[cfg(test)]
+extern crate env_logger;
+
 extern crate base64;
 extern crate rand;
 extern crate ring;
