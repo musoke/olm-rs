@@ -442,8 +442,7 @@ impl State {
 
     fn skip_message_keys(&mut self, until: usize) -> Result<()> {
         if self.n_receive + State::MAX_SKIP < until {
-            // Error::from("To many skipped messages")
-            unimplemented!()
+            Err(ErrorKind::SkippedMessageOverflow.into())
         } else if self.chain_key_receive.is_some() {
             while self.n_receive < until {
                 let (ck, mk) = State::kdf_ck(self.chain_key_receive.unwrap());
@@ -489,7 +488,7 @@ impl State {
 
             let result = encryptor
                 .encrypt(&mut read_buffer, &mut write_buffer, true)
-                .expect("Can encrypt to buffer");
+                .map_err(|e| ErrorKind::EncryptionError(e))?;
 
             ciphertext.extend(
                 write_buffer
@@ -543,7 +542,7 @@ impl State {
 
             let result = decryptor
                 .decrypt(&mut read_buffer, &mut write_buffer, true)
-                .expect("Can decrypt to buffer");
+                .map_err(|e| ErrorKind::DecryptionError(e))?;
 
             plaintext.extend(
                 write_buffer

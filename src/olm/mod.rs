@@ -11,7 +11,24 @@ mod errors {
             RingUnspecified(::ring::error::Unspecified);
         }
         errors {
-            Base64DecodeError
+            Base64DecodeError {
+                description("An error occurred during base64 decoding")
+                display("Unable to decode")
+            }
+
+            EncryptionError(kind: ::crypto::symmetriccipher::SymmetricCipherError) {
+                description("An error occurred during message encryption")
+                display("Unable to encrypt")
+            }
+
+            DecryptionError(kind: ::crypto::symmetriccipher::SymmetricCipherError) {
+                description("An error occurred during message decryption")
+                display("Unable to decrypt")
+            }
+
+            SkippedMessageOverflow {
+                description("Too many skipped message keys")
+            }
         }
     }
 }
