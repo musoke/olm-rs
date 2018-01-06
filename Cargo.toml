@@ -9,11 +9,11 @@ env_logger = "0.4.3"
 error-chain = "0.10.0"
 log = "0.3.8"
 rand = "0.3.16"
-ring = "0.9.7"
+ring = "0.13.0-alpha"
 rust-crypto = "0.2.36"
 serde = "1.0.9"
 serde_derive = "1.0.9"
-untrusted = "0.5.1"
+untrusted = "0.6"
 
 [dependencies.ruma-identifiers]
 branch = "synapse-workarounds"
