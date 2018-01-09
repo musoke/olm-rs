@@ -84,24 +84,6 @@ impl<'a> LocalDevice {
         })
     }
 
-    /// Load device config from file
-    ///
-    /// unimplemented
-    ///
-    /// Needs forthcoming updates to ring; see https://github.com/briansmith/ring/issues/331
-    pub fn from_file() -> Result<Self> {
-        unimplemented!()
-    }
-
-    /// Save device config
-    ///
-    /// unimplemented
-    ///
-    /// Needs forthcoming updates to ring; see https://github.com/briansmith/ring/issues/331
-    pub fn to_file(&self) -> Result<()> {
-        unimplemented!()
-    }
-
     /// Get one-time public keys
     pub fn get_one_time_keys(&self) -> Vec<&one_time_key::Curve25519Pub> {
         self.one_time_key_pairs.get_keys()
