@@ -18,14 +18,6 @@ impl Store {
     pub fn new() -> Self {
         Self { hashmap: HashMap::new() }
     }
-
-    pub fn import() -> Self {
-        unimplemented!()
-    }
-
-    pub fn export() -> Self {
-        unimplemented!()
-    }
 }
 
 impl Store {
