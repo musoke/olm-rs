@@ -7,7 +7,7 @@ use olm::signing_key::SigningKey;
 
 use ruma_identifiers::UserId;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DeviceId {
     // TODO: Any requirements on format? Spec just says string; most examples seem to be ~10 upper
     // case letters
@@ -35,6 +35,13 @@ where
     }
 }
 
+// TODO: Rewrite with std::convert
+impl DeviceId {
+    pub fn to_string(&self) -> String {
+        self.id.clone()
+    }
+}
+
 pub struct LocalDevice {
     user_id: UserId,
     device_id: DeviceId,
@@ -44,7 +51,17 @@ pub struct LocalDevice {
     ratchets: ratchet::Store,
 }
 
-impl<'a> LocalDevice {
+impl LocalDevice {
+    pub fn user_id(&self) -> UserId {
+        self.user_id.clone()
+    }
+
+    pub fn device_id(&self) -> DeviceId {
+        self.device_id.clone()
+    }
+}
+
+impl LocalDevice {
     /// Initialize a new device for given user
     ///
     /// To be used when creating a new device; use `LocalDevice::from_file` when reloading an old
