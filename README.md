@@ -13,6 +13,7 @@ Relevant docs:
 
   - [Unstable matrix spec](https://matrix.org/speculator/spec/drafts%2Fe2e/client_server/unstable.html#end-to-end-encryption)
   - https://matrix.to/#/!wzHrsErnsyaqbpFiRQ:matrix.org/$1481746849447546UYXxY:matrix.org
+  - https://matrix.org/~matthew/2016-12-22%20Matrix%20Balancing%20Interop%20and%20Privacy.pdf
 
 ## Differences between Double Ratchet and Olm
 
@@ -33,7 +34,9 @@ applies a HKDF with a different info (`OLM_ROOT` instead of `OLM_RATCHET`).
     horribly insceure for actual use.
 
   - Better implementation of encryption.
-    `ring` does not yet have AES-CBC with HMAC-SHA256, so I've cobbled it together from `rust-crypto`.
+
+    `ring` does not yet have AES-CBC with HMAC-SHA256, so I've cobbled it
+    together from `rust-crypto`, likely not very well.
 
 # Warning
 
