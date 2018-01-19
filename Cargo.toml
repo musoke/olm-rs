@@ -28,7 +28,6 @@ git = "https://github.com/musoke/ruma-signatures"
 branch = "unstable-e2e"
 
 [dev-dependencies]
-futures = "0.1.14"
 tokio-core = "0.1.8"
 url = "1.5.1"
 
@@ -39,3 +38,7 @@ git = "https://github.com/musoke/ruma-client"
 [dev-dependencies.ruma-events]
 branch = "synapse-workarounds"
 git = "https://github.com/jplatte/ruma-events"
+
+[dev-dependencies.futures-await]
+git = 'https://github.com/alexcrichton/futures-await'
+
