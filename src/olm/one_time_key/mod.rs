@@ -42,8 +42,7 @@ pub trait OneTimeKeyPriv {
     fn public_key(&self) -> Self::Public;
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct Curve25519Pub {
     pub_key: Vec<u8>,
 }
@@ -104,7 +103,6 @@ impl Curve25519Priv {
 
     /// This is a temporary hack
     pub fn generate_unrandom() -> Result<Self> {
-
         use rand;
         let seed = rand::random::<u8>();
 
@@ -118,9 +116,9 @@ impl Curve25519Priv {
         // Calculate corresponding public key
         let mut public_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
         let public_key = &mut public_key[..private_key.public_key_len()];
-        private_key.compute_public_key(public_key).expect(
-            "can get public key from generated private key",
-        );
+        private_key
+            .compute_public_key(public_key)
+            .expect("can get public key from generated private key");
 
         Ok(Curve25519Priv {
             seed: seed,
@@ -174,8 +172,9 @@ impl Store {
     /// let s = olm::olm::one_time_key::Store::generate().expect("Can generate onetime key store");
     /// ```
     pub fn generate() -> Result<Self> {
-        let mut store =
-            Store { hashmap: HashMap::with_capacity(Self::DEFAULT_NUM_ONE_TIME_KEY_PAIRS) };
+        let mut store = Store {
+            hashmap: HashMap::with_capacity(Self::DEFAULT_NUM_ONE_TIME_KEY_PAIRS),
+        };
 
         for _ in 0..Self::DEFAULT_NUM_ONE_TIME_KEY_PAIRS {
             // TODO generate an actual random key
@@ -221,7 +220,6 @@ impl Store {
     }
 }
 
-
 #[cfg(test)]
 mod test {
 
@@ -229,7 +227,6 @@ mod test {
 
     #[test]
     fn consistent_one_time() {
-
         let a = Curve25519Priv::generate_unrandom().unwrap();
         let b = Curve25519Priv::generate_unrandom().unwrap();
 

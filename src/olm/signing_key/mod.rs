@@ -120,9 +120,8 @@ impl Ed25519Pair {
         let rng = ring::rand::SystemRandom::new();
 
         // Generate a new signing key
-        let pkcs8_bytes = signature::Ed25519KeyPair::generate_pkcs8(&rng).chain_err(
-            || "Unable to generate signature key",
-        )?;
+        let pkcs8_bytes = signature::Ed25519KeyPair::generate_pkcs8(&rng)
+            .chain_err(|| "Unable to generate signature key")?;
         // TODO Normally the application would store the PKCS#8 file persistently. Later it would
         // read the PKCS#8 file from persistent storage to use it.
         let signing_key_pair =
@@ -143,9 +142,8 @@ impl Ed25519Pair {
 
         Ok(Ed25519Pair {
             pkcs8: Some(pkcs8),
-            pair: signature::Ed25519KeyPair::from_pkcs8(input).chain_err(
-                || "Failed to load private key",
-            )?,
+            pair: signature::Ed25519KeyPair::from_pkcs8(input)
+                .chain_err(|| "Failed to load private key")?,
         })
     }
 

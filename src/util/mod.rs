@@ -30,8 +30,7 @@ where
         base64::LineWrap::NoWrap,
     );
 
-    Ok(base64::decode_config(&i, config)
-        .chain_err(|| "failed to decode base64")?)
+    Ok(base64::decode_config(&i, config).chain_err(|| "failed to decode base64")?)
 }
 
 #[cfg(test)]

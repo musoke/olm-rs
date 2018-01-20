@@ -7,8 +7,7 @@ use olm::{identity_key, one_time_key};
 use olm::one_time_key::{OneTimeKey, OneTimeKeyPriv};
 use olm::identity_key::{IdentityKey, IdentityKeyPriv};
 
-use crypto::buffer::{ReadBuffer, WriteBuffer, BufferResult};
-
+use crypto::buffer::{BufferResult, ReadBuffer, WriteBuffer};
 
 pub struct Store {
     hashmap: HashMap<RatchetId, Ratchet>,
@@ -16,7 +15,9 @@ pub struct Store {
 
 impl Store {
     pub fn new() -> Self {
-        Self { hashmap: HashMap::new() }
+        Self {
+            hashmap: HashMap::new(),
+        }
     }
 }
 
@@ -37,8 +38,7 @@ struct Ratchet {
     state: State,
 }
 
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct State {
     dh_self: Option<one_time_key::Curve25519Priv>,
     dh_remote: Option<one_time_key::Curve25519Pub>,
@@ -51,8 +51,7 @@ struct State {
     mk_skipped: HashMap<(one_time_key::Curve25519Pub, usize), [u8; 32]>,
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct MessageHeader {
     pub dh_key: one_time_key::Curve25519Pub,
     pub n_previous: usize,
@@ -67,7 +66,6 @@ impl Ratchet {
         ident_bob: &identity_key::Curve25519Pub,
         one_time_bob: one_time_key::Curve25519Pub,
     ) -> Result<Self> {
-
         let state = State::init_sending(ident_alice, one_time_alice, ident_bob, one_time_bob)
             .chain_err(|| "Failed to initialize ratchet for sending")?;
 
@@ -88,7 +86,6 @@ impl Ratchet {
         header: MessageHeader,
         ciphertext: &Vec<u8>,
     ) -> Result<Self> {
-
         let state =
             State::init_receiving(ident_bob, one_time_bob, ident_alice, one_time_alice, header)
                 .chain_err(|| "Failed to initialize ratchet for receiving")?;
@@ -326,12 +323,12 @@ impl State {
 
     fn ecdh(&mut self) -> Result<Vec<u8>> {
         // Take the DH keys so that can use them
-        let dh_self = self.dh_self.take().expect(
-            "Should always have own private key",
-        );
-        let dh_remote = self.dh_remote.take().expect(
-            "Should always have remote public key",
-        );
+        let dh_self = self.dh_self
+            .take()
+            .expect("Should always have own private key");
+        let dh_remote = self.dh_remote
+            .take()
+            .expect("Should always have remote public key");
 
         let secret = agreement::agree_ephemeral(
             dh_self.private_key(),
@@ -359,7 +356,6 @@ impl State {
         let (aes_key, hmac_key, aes_iv) = State::derive_aead_keys(mk);
 
         let ciphertext = State::encrypt(aes_key, aes_iv, plaintext)?;
-
 
         let header = MessageHeader {
             dh_key: self.dh_self_public().unwrap(),
@@ -444,11 +440,9 @@ impl State {
     }
 
     fn skip_message_keys(&mut self, until: usize) -> Result<()> {
-
         debug!(
             "Skipping message keys from {} up to {}",
-            self.n_receive,
-            until
+            self.n_receive, until
         );
 
         if self.n_receive + State::MAX_SKIP < until {
@@ -473,9 +467,7 @@ impl State {
         }
     }
 
-
     fn encrypt(aes_key: [u8; 32], aes_iv: [u8; 16], plaintext: &Vec<u8>) -> Result<Vec<u8>> {
-
         use crypto;
         use crypto::aes;
 
@@ -495,7 +487,6 @@ impl State {
         let mut write_buffer = crypto::buffer::RefWriteBuffer::new(&mut buffer);
 
         loop {
-
             let result = encryptor
                 .encrypt(&mut read_buffer, &mut write_buffer, true)
                 .map_err(|e| ErrorKind::EncryptionError(e))?;
@@ -518,7 +509,6 @@ impl State {
     }
 
     fn decrypt_and_auth(mk: [u8; 32], ciphertext: &Vec<u8>) -> Result<Vec<u8>> {
-
         let (aes_key, hmac_key, aes_iv) = State::derive_aead_keys(mk);
 
         // FIXME: HMAC auth
@@ -529,7 +519,6 @@ impl State {
     }
 
     fn decrypt(aes_key: [u8; 32], aes_iv: [u8; 16], ciphertext: &Vec<u8>) -> Result<Vec<u8>> {
-
         debug!("aes_key: {:?}", aes_key);
         debug!("aes_iv: {:?}", aes_iv);
 
@@ -549,7 +538,6 @@ impl State {
         let mut write_buffer = crypto::buffer::RefWriteBuffer::new(&mut buffer);
 
         loop {
-
             let result = decryptor
                 .decrypt(&mut read_buffer, &mut write_buffer, true)
                 .map_err(|e| ErrorKind::DecryptionError(e))?;
@@ -614,7 +602,6 @@ impl State {
     ///
     /// Note that this consumes the input chain key whereas `kdf_mk` does not.
     fn kdf_ck(ck: [u8; 32]) -> ([u8; 32], [u8; 32]) {
-
         let mk = State::kdf_mk(&ck);
 
         // TODO: HMAC_HASH should probably be a static
@@ -647,17 +634,20 @@ mod test {
     use olm::one_time_key::{OneTimeKey, OneTimeKeyPriv};
     use olm::ratchet::Ratchet;
 
-    fn generate_keys()
-        -> ((identity_key::Curve25519Priv,
-             one_time_key::Curve25519Priv,
-             identity_key::Curve25519Pub,
-             one_time_key::Curve25519Pub),
-            (identity_key::Curve25519Priv,
-             one_time_key::Curve25519Priv,
-             identity_key::Curve25519Pub,
-             one_time_key::Curve25519Pub))
-    {
-
+    fn generate_keys() -> (
+        (
+            identity_key::Curve25519Priv,
+            one_time_key::Curve25519Priv,
+            identity_key::Curve25519Pub,
+            one_time_key::Curve25519Pub,
+        ),
+        (
+            identity_key::Curve25519Priv,
+            one_time_key::Curve25519Priv,
+            identity_key::Curve25519Pub,
+            one_time_key::Curve25519Pub,
+        ),
+    ) {
         ::env_logger::LogBuilder::new()
             .target(::env_logger::LogTarget::Stdout)
             .init();
@@ -691,7 +681,6 @@ mod test {
     // Check that ratchet states are consistent when advancing chain key
     #[test]
     fn simple_encrypt_decrypt() {
-
         let (keys_alice, keys_bob) = generate_keys();
 
         let mut ratchet_alice =
@@ -700,9 +689,9 @@ mod test {
 
         let plain_alice = vec![0, 1, 2];
 
-        let (header, ciphertext) = ratchet_alice.encrypt(&plain_alice).expect(
-            "Can encrypt the message",
-        );
+        let (header, ciphertext) = ratchet_alice
+            .encrypt(&plain_alice)
+            .expect("Can encrypt the message");
         debug!("header: {:?}", header);
 
         let mut ratchet_bob = Ratchet::init_receiving(
@@ -726,9 +715,9 @@ mod test {
         debug!("ciphertext bytes: {:?}", ciphertext);
         debug!("ciphertext length: {:?}", ciphertext.len());
 
-        let plain_bob = ratchet_bob.decrypt(header, &ciphertext).expect(
-            "Can decrypt the message",
-        );
+        let plain_bob = ratchet_bob
+            .decrypt(header, &ciphertext)
+            .expect("Can decrypt the message");
 
         // Alice's public DH key should match that of Bob
         assert_eq!(
@@ -747,13 +736,11 @@ mod test {
             ratchet_alice.state.chain_key_sending,
             ratchet_bob.state.chain_key_receive
         );
-
     }
 
     // Check decrypting multiple in order messages
     #[test]
     fn encrypt_decrypt_3() {
-
         let (keys_alice, keys_bob) = generate_keys();
 
         let mut ratchet_alice =
@@ -761,21 +748,21 @@ mod test {
                 .expect("Can generate Alice's ratchet");
 
         let plain_alice_1 = vec![0, 1, 2];
-        let (header_1, ciphertext_1) = ratchet_alice.encrypt(&plain_alice_1).expect(
-            "Can encrypt the message",
-        );
+        let (header_1, ciphertext_1) = ratchet_alice
+            .encrypt(&plain_alice_1)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let plain_alice_2 = vec![0, 1, 2, 3];
-        let (header_2, ciphertext_2) = ratchet_alice.encrypt(&plain_alice_2).expect(
-            "Can encrypt the message",
-        );
+        let (header_2, ciphertext_2) = ratchet_alice
+            .encrypt(&plain_alice_2)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let plain_alice_3 = vec![0, 1, 2];
-        let (header_3, ciphertext_3) = ratchet_alice.encrypt(&plain_alice_1).expect(
-            "Can encrypt the message",
-        );
+        let (header_3, ciphertext_3) = ratchet_alice
+            .encrypt(&plain_alice_1)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let mut ratchet_bob = Ratchet::init_receiving(
@@ -788,29 +775,27 @@ mod test {
         ).expect("Can generate Bob's ratchet");
 
         // Decrypt 1st message
-        let plain_bob_1 = ratchet_bob.decrypt(header_1, &ciphertext_1).expect(
-            "Can decrypt the first message",
-        );
+        let plain_bob_1 = ratchet_bob
+            .decrypt(header_1, &ciphertext_1)
+            .expect("Can decrypt the first message");
         assert_eq!(plain_alice_1, plain_bob_1);
 
         // Decrypt 2nd message
-        let plain_bob_2 = ratchet_bob.decrypt(header_2, &ciphertext_2).expect(
-            "Can decrypt message",
-        );
+        let plain_bob_2 = ratchet_bob
+            .decrypt(header_2, &ciphertext_2)
+            .expect("Can decrypt message");
         assert_eq!(plain_alice_2, plain_bob_2);
 
         // Decrypt 3rd message
-        let plain_bob_3 = ratchet_bob.decrypt(header_3, &ciphertext_3).expect(
-            "Can decrypt message",
-        );
+        let plain_bob_3 = ratchet_bob
+            .decrypt(header_3, &ciphertext_3)
+            .expect("Can decrypt message");
         assert_eq!(plain_alice_3, plain_bob_3);
-
     }
 
     // Check decrypting multiple out of order messages
     #[test]
     fn out_of_order_1_3_2() {
-
         let (keys_alice, keys_bob) = generate_keys();
 
         let mut ratchet_alice =
@@ -818,21 +803,21 @@ mod test {
                 .expect("Can generate Alice's ratchet");
 
         let plain_alice_1 = vec![0, 1, 2];
-        let (header_1, ciphertext_1) = ratchet_alice.encrypt(&plain_alice_1).expect(
-            "Can encrypt the message",
-        );
+        let (header_1, ciphertext_1) = ratchet_alice
+            .encrypt(&plain_alice_1)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let plain_alice_2 = vec![0, 1, 2, 3];
-        let (header_2, ciphertext_2) = ratchet_alice.encrypt(&plain_alice_2).expect(
-            "Can encrypt the message",
-        );
+        let (header_2, ciphertext_2) = ratchet_alice
+            .encrypt(&plain_alice_2)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let plain_alice_3 = vec![0, 1, 2, 3, 4];
-        let (header_3, ciphertext_3) = ratchet_alice.encrypt(&plain_alice_3).expect(
-            "Can encrypt the message",
-        );
+        let (header_3, ciphertext_3) = ratchet_alice
+            .encrypt(&plain_alice_3)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let mut ratchet_bob = Ratchet::init_receiving(
@@ -845,29 +830,27 @@ mod test {
         ).expect("Can generate Bob's ratchet");
 
         // Decrypt 1st message
-        let plain_bob_1 = ratchet_bob.decrypt(header_1, &ciphertext_1).expect(
-            "Can decrypt the first message",
-        );
+        let plain_bob_1 = ratchet_bob
+            .decrypt(header_1, &ciphertext_1)
+            .expect("Can decrypt the first message");
         assert_eq!(plain_alice_1, plain_bob_1);
 
         // Decrypt 3rd message
-        let plain_bob_3 = ratchet_bob.decrypt(header_3, &ciphertext_3).expect(
-            "Can decrypt message",
-        );
+        let plain_bob_3 = ratchet_bob
+            .decrypt(header_3, &ciphertext_3)
+            .expect("Can decrypt message");
         assert_eq!(plain_alice_3, plain_bob_3);
 
         // Decrypt 2nd message
-        let plain_bob_2 = ratchet_bob.decrypt(header_2, &ciphertext_2).expect(
-            "Can decrypt message",
-        );
+        let plain_bob_2 = ratchet_bob
+            .decrypt(header_2, &ciphertext_2)
+            .expect("Can decrypt message");
         assert_eq!(plain_alice_2, plain_bob_2);
-
     }
 
     // Check decrypting multiple out of order messages
     #[test]
     fn out_of_order_3_2_1() {
-
         let (keys_alice, keys_bob) = generate_keys();
 
         let mut ratchet_alice =
@@ -875,21 +858,21 @@ mod test {
                 .expect("Can generate Alice's ratchet");
 
         let plain_alice_1 = vec![0, 1, 2];
-        let (header_1, ciphertext_1) = ratchet_alice.encrypt(&plain_alice_1).expect(
-            "Can encrypt the message",
-        );
+        let (header_1, ciphertext_1) = ratchet_alice
+            .encrypt(&plain_alice_1)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let plain_alice_2 = vec![0, 1, 2, 3];
-        let (header_2, ciphertext_2) = ratchet_alice.encrypt(&plain_alice_2).expect(
-            "Can encrypt the message",
-        );
+        let (header_2, ciphertext_2) = ratchet_alice
+            .encrypt(&plain_alice_2)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let plain_alice_3 = vec![0, 1, 2, 3, 4];
-        let (header_3, ciphertext_3) = ratchet_alice.encrypt(&plain_alice_3).expect(
-            "Can encrypt the message",
-        );
+        let (header_3, ciphertext_3) = ratchet_alice
+            .encrypt(&plain_alice_3)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let mut ratchet_bob = Ratchet::init_receiving(
@@ -902,29 +885,27 @@ mod test {
         ).expect("Can generate Bob's ratchet");
 
         // Decrypt 3rd message first
-        let plain_bob_3 = ratchet_bob.decrypt(header_3, &ciphertext_3).expect(
-            "Can decrypt the first message",
-        );
+        let plain_bob_3 = ratchet_bob
+            .decrypt(header_3, &ciphertext_3)
+            .expect("Can decrypt the first message");
         assert_eq!(plain_alice_3, plain_bob_3);
 
         // Decrypt 2nd message
-        let plain_bob_2 = ratchet_bob.decrypt(header_2, &ciphertext_2).expect(
-            "Can decrypt message",
-        );
+        let plain_bob_2 = ratchet_bob
+            .decrypt(header_2, &ciphertext_2)
+            .expect("Can decrypt message");
         assert_eq!(plain_alice_2, plain_bob_2);
 
         // Decrypt 1st message
-        let plain_bob_1 = ratchet_bob.decrypt(header_1, &ciphertext_1).expect(
-            "Can decrypt message",
-        );
+        let plain_bob_1 = ratchet_bob
+            .decrypt(header_1, &ciphertext_1)
+            .expect("Can decrypt message");
         assert_eq!(plain_alice_1, plain_bob_1);
-
     }
 
     // Replying to messages
     #[test]
     fn reply() {
-
         let (keys_alice, keys_bob) = generate_keys();
 
         let mut ratchet_alice =
@@ -932,9 +913,9 @@ mod test {
                 .expect("Can generate Alice's ratchet");
 
         let plain_alice_1 = vec![0, 1, 2];
-        let (header_1, ciphertext_1) = ratchet_alice.encrypt(&plain_alice_1).expect(
-            "Can encrypt the message",
-        );
+        let (header_1, ciphertext_1) = ratchet_alice
+            .encrypt(&plain_alice_1)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let mut ratchet_bob = Ratchet::init_receiving(
@@ -947,29 +928,27 @@ mod test {
         ).expect("Can generate Bob's ratchet");
 
         // Decrypt 1st message
-        let plain_bob_1 = ratchet_bob.decrypt(header_1, &ciphertext_1).expect(
-            "Can decrypt the first message",
-        );
+        let plain_bob_1 = ratchet_bob
+            .decrypt(header_1, &ciphertext_1)
+            .expect("Can decrypt the first message");
         assert_eq!(plain_alice_1, plain_bob_1);
 
         let plain_bob_2 = vec![2, 1, 0];
-        let (header_2, ciphertext_2) = ratchet_bob.encrypt(&plain_bob_2).expect(
-            "Can encrypt the message",
-        );
+        let (header_2, ciphertext_2) = ratchet_bob
+            .encrypt(&plain_bob_2)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_2.len(), 0);
 
         // Decrypt reply
-        let plain_alice_2 = ratchet_alice.decrypt(header_2, &ciphertext_2).expect(
-            "Can decrypt the first message",
-        );
+        let plain_alice_2 = ratchet_alice
+            .decrypt(header_2, &ciphertext_2)
+            .expect("Can decrypt the first message");
         assert_eq!(plain_alice_2, plain_bob_2);
-
     }
 
     // Replying to messages
     #[test]
     fn reply_reply() {
-
         let (keys_alice, keys_bob) = generate_keys();
 
         let mut ratchet_alice =
@@ -978,9 +957,9 @@ mod test {
 
         // First message
         let plain_alice_1 = vec![0];
-        let (header_1, ciphertext_1) = ratchet_alice.encrypt(&plain_alice_1).expect(
-            "Can encrypt the message",
-        );
+        let (header_1, ciphertext_1) = ratchet_alice
+            .encrypt(&plain_alice_1)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_1.len(), 0);
 
         let mut ratchet_bob = Ratchet::init_receiving(
@@ -991,34 +970,33 @@ mod test {
             header_1.clone(),
             &ciphertext_1,
         ).expect("Can generate Bob's ratchet");
-        let plain_bob_1 = ratchet_bob.decrypt(header_1, &ciphertext_1).expect(
-            "Can decrypt the first message",
-        );
+        let plain_bob_1 = ratchet_bob
+            .decrypt(header_1, &ciphertext_1)
+            .expect("Can decrypt the first message");
         assert_eq!(plain_alice_1, plain_bob_1);
 
         // Reply
         let plain_bob_2 = vec![1];
-        let (header_2, ciphertext_2) = ratchet_bob.encrypt(&plain_bob_2).expect(
-            "Can encrypt the message",
-        );
+        let (header_2, ciphertext_2) = ratchet_bob
+            .encrypt(&plain_bob_2)
+            .expect("Can encrypt the message");
         assert_ne!(ciphertext_2.len(), 0);
-        let plain_alice_2 = ratchet_alice.decrypt(header_2, &ciphertext_2).expect(
-            "Can decrypt the first message",
-        );
+        let plain_alice_2 = ratchet_alice
+            .decrypt(header_2, &ciphertext_2)
+            .expect("Can decrypt the first message");
         assert_eq!(plain_alice_2, plain_bob_2);
 
         // Reply to reply
         debug!("Encrypt message #3");
         let plain_alice_3 = vec![3];
-        let (header_3, ciphertext_3) = ratchet_alice.encrypt(&plain_alice_3).expect(
-            "Can encrypt the message",
-        );
+        let (header_3, ciphertext_3) = ratchet_alice
+            .encrypt(&plain_alice_3)
+            .expect("Can encrypt the message");
         debug!("Decrypt message #3, header: {:?}", header_3);
-        let plain_bob_3 = ratchet_bob.decrypt(header_3, &ciphertext_3).expect(
-            "Can decrypt the first message",
-        );
+        let plain_bob_3 = ratchet_bob
+            .decrypt(header_3, &ciphertext_3)
+            .expect("Can decrypt the first message");
         assert_eq!(plain_alice_3, plain_bob_3);
-
     }
 
 }

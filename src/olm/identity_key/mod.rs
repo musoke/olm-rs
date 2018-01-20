@@ -93,7 +93,6 @@ impl Curve25519Priv {
 
     /// This is a temporary hack
     pub fn generate_unrandom() -> Result<Self> {
-
         use rand;
         let seed = rand::random::<u8>();
 
@@ -107,9 +106,9 @@ impl Curve25519Priv {
         // Calculate corresponding public key
         let mut public_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
         let public_key = &mut public_key[..private_key.public_key_len()];
-        private_key.compute_public_key(public_key).expect(
-            "can get public key from generated private key",
-        );
+        private_key
+            .compute_public_key(public_key)
+            .expect("can get public key from generated private key");
 
         Ok(Curve25519Priv {
             seed: seed,

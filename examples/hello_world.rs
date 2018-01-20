@@ -43,10 +43,12 @@ fn hello_world(
         let dev_keys = my_dev.olm_acount_identity_keys();
 
         // No keys yet, so this should return an empty list
-        let response = await!(unstable::keys::upload::call(client.clone(), unstable::keys::upload::Request {
-            device_keys: None,
-            one_time_keys: None,
-        }));
+        let response = await!(
+            unstable::keys::upload::call(client.clone(), unstable::keys::upload::Request {
+                device_keys: None,
+                one_time_keys: None,
+            })
+        );
         println!("Before uploading one-time keys: {:?}", response);
 
         // A faked one-time key for now.  Will generate an actual one later.
@@ -56,10 +58,12 @@ fn hello_world(
             "/qyvZvwjiTxGdGU0RCguDCLeR+nmsb3FfNG3/Ve4vU8".to_owned(),
         );
         // Upload some keys, should now get a non-zero response...
-        let response = await!(unstable::keys::upload::call(client.clone(), unstable::keys::upload::Request {
-            device_keys: Some(dev_keys),
-            one_time_keys: Some(one_time_keys),
-        }));
+        let response = await!(
+            unstable::keys::upload::call(client.clone(), unstable::keys::upload::Request {
+                device_keys: Some(dev_keys),
+                one_time_keys: Some(one_time_keys),
+            })
+        );
         println!("After uploading one-time keys: {:?}", response);
 
 
