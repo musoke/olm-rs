@@ -4,6 +4,9 @@ use util;
 use errors::*;
 use olm::{identity_key, one_time_key, ratchet, signing_key};
 use olm::signing_key::SigningKey;
+use serde_json::value::Value;
+use ruma_signatures;
+use ruma_signatures::Signature;
 
 use ruma_identifiers::UserId;
 
@@ -126,6 +129,12 @@ impl LocalDevice {
     /// ```
     pub fn contains(&self, k: &one_time_key::Curve25519Pub) -> bool {
         self.one_time_key_pairs.contains_key(k)
+    }
+
+    /// Sign some json object
+    pub fn sign_json(&self, value: &Value) -> Result<Signature> {
+        // TODO: handle errors
+        Ok(ruma_signatures::sign_json(&self.signing_key_pair, value).unwrap())
     }
 }
 

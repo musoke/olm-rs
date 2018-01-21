@@ -3,7 +3,8 @@ use device::{Device, LocalDevice};
 
 use ruma_identifiers::UserId;
 use ruma_client_api::unstable::keys::DeviceKeys;
-use ruma_signatures::UserSignatures;
+use ruma_signatures::{SignatureSet, UserSignatures};
+use serde_json;
 
 use std::collections::HashMap;
 
@@ -52,7 +53,7 @@ impl LocalDevice {
             self.fingerprint_base64(),
         );
 
-        let device_keys = DeviceKeys {
+        let mut device_keys = DeviceKeys {
             user_id: self.user_id(),
             device_id: self.device_id().to_string(),
             // TODO: other algorithms
@@ -62,7 +63,15 @@ impl LocalDevice {
             unsigned: None,
         };
 
-        // TODO: sign object
+        let mut signature_set = SignatureSet::new();
+        // TODO: handle errors
+        signature_set.insert(
+            self.sign_json(&serde_json::to_value(&device_keys).unwrap())
+                .unwrap(),
+        );
+        device_keys
+            .signatures
+            .insert(&self.user_id().to_string(), signature_set);
 
         device_keys
     }

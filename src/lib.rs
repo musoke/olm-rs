@@ -16,6 +16,8 @@ mod errors {
 
 pub use errors::*;
 
+extern crate core;
+
 #[cfg(test)]
 extern crate env_logger;
 #[macro_use]
@@ -25,10 +27,12 @@ extern crate base64;
 extern crate crypto;
 extern crate rand;
 extern crate ring;
+extern crate untrusted;
+
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate untrusted;
+extern crate serde_json;
 
 extern crate ruma_client_api;
 extern crate ruma_identifiers;

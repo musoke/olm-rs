@@ -3,6 +3,9 @@ use ring::signature;
 use untrusted;
 use util;
 use olm::errors::*;
+use ruma_signatures::{KeyPair, Signature};
+use ruma_signatures::Error as RumaSignaturesError;
+use core::result::Result as CoreResult;
 
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
 // should "inherit" the `SigningKey` and `SigningKeyPair` traits from the members.
@@ -31,6 +34,9 @@ pub trait SigningKey {
     /// Verify a signature
     ///
     fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<()>;
+
+    // /// Version
+    // fn version(&self);
 }
 
 /// Trait exposing methods on a private/pub key key pair
@@ -173,5 +179,19 @@ impl SigningKey for Ed25519Pair {
 impl SigningKeyPair for Ed25519Pair {
     fn sign(&self, msg: &[u8]) -> signature::Signature {
         self.pair.sign(msg)
+    }
+}
+
+impl KeyPair for Ed25519Pair {
+    fn new(
+        public_key: &[u8],
+        private_key: &[u8],
+        version: String,
+    ) -> CoreResult<Self, RumaSignaturesError> {
+        unimplemented!()
+    }
+
+    fn sign(&self, message: &[u8]) -> Signature {
+        Signature::new("ed25519:1", SigningKeyPair::sign(self, message).as_ref()).unwrap()
     }
 }
