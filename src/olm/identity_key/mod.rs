@@ -1,7 +1,7 @@
 use ring;
 use ring::agreement;
 use untrusted;
-use util;
+use olm_util as util;
 use std::fmt;
 
 #[derive(Fail, Debug)]

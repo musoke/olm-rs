@@ -2,8 +2,9 @@ use ring;
 use ring::agreement;
 use ring::{hkdf, hmac};
 use std::collections::HashMap;
-use olm::{identity_key, one_time_key};
-use olm::one_time_key::{OneTimeKey, OneTimeKeyPriv};
+use olm::identity_key;
+use one_time_keys;
+use one_time_keys::{OneTimeKey, OneTimeKeyPriv};
 use olm::identity_key::{IdentityKey, IdentityKeyPriv};
 
 use crypto::buffer::{BufferResult, ReadBuffer, WriteBuffer};
@@ -46,20 +47,20 @@ struct Ratchet {
 
 #[derive(Debug, Default)]
 struct State {
-    dh_self: Option<one_time_key::Curve25519Priv>,
-    dh_remote: Option<one_time_key::Curve25519Pub>,
+    dh_self: Option<one_time_keys::Curve25519Priv>,
+    dh_remote: Option<one_time_keys::Curve25519Pub>,
     root_key: [u8; 32],
     chain_key_sending: Option<[u8; 32]>,
     chain_key_receive: Option<[u8; 32]>,
     n_sending: usize,
     n_receive: usize,
     n_previous: usize,
-    mk_skipped: HashMap<(one_time_key::Curve25519Pub, usize), [u8; 32]>,
+    mk_skipped: HashMap<(one_time_keys::Curve25519Pub, usize), [u8; 32]>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct MessageHeader {
-    pub dh_key: one_time_key::Curve25519Pub,
+    pub dh_key: one_time_keys::Curve25519Pub,
     pub n_previous: usize,
     pub n: usize,
 }
@@ -67,10 +68,10 @@ struct MessageHeader {
 impl Ratchet {
     pub fn init_sending(
         ident_alice: identity_key::Curve25519Priv,
-        one_time_alice: one_time_key::Curve25519Priv,
+        one_time_alice: one_time_keys::Curve25519Priv,
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: &identity_key::Curve25519Pub,
-        one_time_bob: one_time_key::Curve25519Pub,
+        one_time_bob: one_time_keys::Curve25519Pub,
     ) -> Result<Self, RatchetError> {
         let state = State::init_sending(ident_alice, one_time_alice, ident_bob, one_time_bob)?;
 
@@ -85,9 +86,9 @@ impl Ratchet {
     pub fn init_receiving(
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: identity_key::Curve25519Priv,
-        one_time_bob: one_time_key::Curve25519Priv,
+        one_time_bob: one_time_keys::Curve25519Priv,
         ident_alice: &identity_key::Curve25519Pub,
-        one_time_alice: one_time_key::Curve25519Pub,
+        one_time_alice: one_time_keys::Curve25519Pub,
         header: MessageHeader,
         ciphertext: &Vec<u8>,
     ) -> Result<Self, RatchetError> {
@@ -133,14 +134,14 @@ impl State {
 
     pub fn init_sending(
         ident_alice: identity_key::Curve25519Priv,
-        one_time_alice: one_time_key::Curve25519Priv,
+        one_time_alice: one_time_keys::Curve25519Priv,
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: &identity_key::Curve25519Pub,
-        one_time_bob: one_time_key::Curve25519Pub,
+        one_time_bob: one_time_keys::Curve25519Pub,
     ) -> Result<Self, RatchetError> {
         let mut state: State = Default::default();
 
-        let dh_self_priv = one_time_key::Curve25519Priv::generate_unrandom()
+        let dh_self_priv = one_time_keys::Curve25519Priv::generate_unrandom()
             .map_err(|_| RatchetError::InitializationError)?;
         state.dh_self = Some(dh_self_priv);
 
@@ -157,9 +158,9 @@ impl State {
     pub fn init_receiving(
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: identity_key::Curve25519Priv,
-        one_time_bob: one_time_key::Curve25519Priv,
+        one_time_bob: one_time_keys::Curve25519Priv,
         ident_alice: &identity_key::Curve25519Pub,
-        one_time_alice: one_time_key::Curve25519Pub,
+        one_time_alice: one_time_keys::Curve25519Pub,
         header: MessageHeader,
     ) -> Result<Self, RatchetError> {
         let mut state: State = Default::default();
@@ -176,7 +177,7 @@ impl State {
         state.dh_remote = Some(header.dh_key);
 
         // Create local DH key
-        state.dh_self = Some(one_time_key::Curve25519Priv::generate_unrandom()
+        state.dh_self = Some(one_time_keys::Curve25519Priv::generate_unrandom()
             .map_err(|_| RatchetError::InitializationError)?);
 
         // Ratchet to get sending chain
@@ -190,10 +191,10 @@ impl State {
 
     fn x3dh_local(
         ident_local: identity_key::Curve25519Priv,
-        one_time_local: one_time_key::Curve25519Priv,
+        one_time_local: one_time_keys::Curve25519Priv,
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_remote: &identity_key::Curve25519Pub,
-        one_time_remote: one_time_key::Curve25519Pub,
+        one_time_remote: one_time_keys::Curve25519Pub,
     ) -> Result<Vec<u8>, RatchetError> {
         // TODO: change once non-ephemeral keys are available
 
@@ -231,10 +232,10 @@ impl State {
 
     fn x3dh_remote(
         ident_local: identity_key::Curve25519Priv,
-        one_time_local: one_time_key::Curve25519Priv,
+        one_time_local: one_time_keys::Curve25519Priv,
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_remote: &identity_key::Curve25519Pub,
-        one_time_remote: one_time_key::Curve25519Pub,
+        one_time_remote: one_time_keys::Curve25519Pub,
     ) -> Result<Vec<u8>, RatchetError> {
         // TODO: change once non-ephemeral keys are available
 
@@ -306,7 +307,7 @@ impl State {
         self.chain_key_receive = Some(ckr);
 
         // Generate new DH key
-        self.dh_self = Some(one_time_key::Curve25519Priv::generate_unrandom().unwrap());
+        self.dh_self = Some(one_time_keys::Curve25519Priv::generate_unrandom().unwrap());
 
         // Ratchet to get new sending chain
         let dh_out = self.ecdh().unwrap();
@@ -387,7 +388,7 @@ impl State {
         Ok((header, ciphertext))
     }
 
-    fn dh_self_public(&mut self) -> Option<one_time_key::Curve25519Pub> {
+    fn dh_self_public(&mut self) -> Option<one_time_keys::Curve25519Pub> {
         // TODO: this is a hack?
         let private = self.dh_self.take().unwrap();
         let public = private.public_key();
@@ -652,23 +653,24 @@ impl Ratchet {
 #[cfg(test)]
 mod test {
 
-    use olm::{identity_key, one_time_key};
+    use one_time_keys;
+    use olm::identity_key;
     use olm::identity_key::{IdentityKey, IdentityKeyPriv};
-    use olm::one_time_key::{OneTimeKey, OneTimeKeyPriv};
+    use one_time_keys::{OneTimeKey, OneTimeKeyPriv};
     use olm::ratchet::Ratchet;
 
     fn generate_keys() -> (
         (
             identity_key::Curve25519Priv,
-            one_time_key::Curve25519Priv,
+            one_time_keys::Curve25519Priv,
             identity_key::Curve25519Pub,
-            one_time_key::Curve25519Pub,
+            one_time_keys::Curve25519Pub,
         ),
         (
             identity_key::Curve25519Priv,
-            one_time_key::Curve25519Priv,
+            one_time_keys::Curve25519Priv,
             identity_key::Curve25519Pub,
-            one_time_key::Curve25519Pub,
+            one_time_keys::Curve25519Pub,
         ),
     ) {
         ::env_logger::LogBuilder::new()
@@ -680,9 +682,9 @@ mod test {
         let bob_ident_priv = identity_key::Curve25519Priv::generate_unrandom().unwrap();
         let bob_ident_pub = bob_ident_priv.public_key();
 
-        let alice_one_time_priv = one_time_key::Curve25519Priv::generate_unrandom().unwrap();
+        let alice_one_time_priv = one_time_keys::Curve25519Priv::generate_unrandom().unwrap();
         let alice_one_time_pub = alice_one_time_priv.public_key();
-        let bob_one_time_priv = one_time_key::Curve25519Priv::generate_unrandom().unwrap();
+        let bob_one_time_priv = one_time_keys::Curve25519Priv::generate_unrandom().unwrap();
         let bob_one_time_pub = bob_one_time_priv.public_key();
 
         (

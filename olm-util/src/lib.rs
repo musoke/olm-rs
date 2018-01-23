@@ -1,4 +1,6 @@
-use base64;
+extern crate base64;
+#[macro_use]
+extern crate failure;
 
 pub fn bin_to_base64<T>(i: &T) -> String
 where

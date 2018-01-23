@@ -1,7 +1,7 @@
 use ring;
 use ring::signature;
 use untrusted;
-use util;
+use olm_util as util;
 use ruma_signatures::{KeyPair, Signature};
 use ruma_signatures::Error as RumaSignaturesError;
 

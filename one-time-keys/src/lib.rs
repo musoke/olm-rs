@@ -1,11 +1,18 @@
-use ring;
+#[macro_use]
+extern crate failure;
+extern crate olm_util;
+extern crate rand;
+extern crate ring;
+extern crate untrusted;
+
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+
 use ring::agreement;
-use untrusted;
-use util;
 use std::collections::HashMap;
 use std::fmt;
 
-use core::result::Result as CoreResult;
 use failure::ResultExt;
 
 #[derive(Debug, Fail, Deserialize)]
@@ -33,7 +40,7 @@ pub trait OneTimeKey {
     /// ```
     /// ```
     fn public_key_base64(&self) -> String {
-        util::bin_to_base64(self.public_key().as_slice_less_safe())
+        olm_util::bin_to_base64(self.public_key().as_slice_less_safe())
     }
 }
 
@@ -104,12 +111,12 @@ impl Curve25519Priv {
     /// Create new one-time key
     ///
     /// Should only be exposed via `LocalDevice::new()`?
-    pub fn generate() -> CoreResult<Self, OneTimeKeyError> {
+    pub fn generate() -> Result<Self, OneTimeKeyError> {
         unimplemented!()
     }
 
     /// This is a temporary hack
-    pub fn generate_unrandom() -> CoreResult<Self, OneTimeKeyError> {
+    pub fn generate_unrandom() -> Result<Self, OneTimeKeyError> {
         use rand;
         let seed = rand::random::<u8>();
 
@@ -177,7 +184,7 @@ impl Store {
     /// ```
     /// let s = olm::olm::one_time_key::Store::generate().expect("Can generate onetime key store");
     /// ```
-    pub fn generate() -> CoreResult<Self, OneTimeKeyError> {
+    pub fn generate() -> Result<Self, OneTimeKeyError> {
         let mut store = Store {
             hashmap: HashMap::with_capacity(Self::DEFAULT_NUM_ONE_TIME_KEY_PAIRS),
         };

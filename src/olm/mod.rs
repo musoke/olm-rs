@@ -11,5 +11,4 @@
 
 pub mod signing_key;
 pub mod identity_key;
-pub mod one_time_key;
 pub mod ratchet;

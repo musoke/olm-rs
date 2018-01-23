@@ -1,7 +1,8 @@
 use std::fmt;
 use untrusted;
-use util;
-use olm::{identity_key, one_time_key, ratchet, signing_key};
+use olm_util as util;
+use one_time_keys;
+use olm::{identity_key, ratchet, signing_key};
 use olm::signing_key::SigningKey;
 use serde_json::value::Value;
 use ruma_signatures;
@@ -54,7 +55,7 @@ pub struct LocalDevice {
     device_id: DeviceId,
     signing_key_pair: signing_key::Ed25519Pair,
     ident_key_priv: identity_key::Curve25519Priv,
-    one_time_key_pairs: one_time_key::Store,
+    one_time_key_pairs: one_time_keys::Store,
     ratchets: ratchet::Store,
 }
 
@@ -105,14 +106,14 @@ impl LocalDevice {
                 .map_err(|_| DeviceError::KeyGenerationError)?,
             ident_key_priv: identity_key::Curve25519Priv::generate_unrandom()
                 .map_err(|_| DeviceError::KeyGenerationError)?,
-            one_time_key_pairs: one_time_key::Store::generate()
+            one_time_key_pairs: one_time_keys::Store::generate()
                 .map_err(|_| DeviceError::KeyGenerationError)?,
             ratchets: ratchet::Store::new(),
         })
     }
 
     /// Get one-time public keys
-    pub fn get_one_time_keys(&self) -> Vec<&one_time_key::Curve25519Pub> {
+    pub fn get_one_time_keys(&self) -> Vec<&one_time_keys::Curve25519Pub> {
         self.one_time_key_pairs.get_keys()
     }
 
@@ -134,7 +135,7 @@ impl LocalDevice {
     ///     assert!(my_dev.contains(keys[2]));
     /// }
     /// ```
-    pub fn contains(&self, k: &one_time_key::Curve25519Pub) -> bool {
+    pub fn contains(&self, k: &one_time_keys::Curve25519Pub) -> bool {
         self.one_time_key_pairs.contains_key(k)
     }
 

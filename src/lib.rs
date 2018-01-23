@@ -25,11 +25,13 @@ extern crate ruma_client_api;
 extern crate ruma_identifiers;
 extern crate ruma_signatures;
 
+extern crate olm_util;
+extern crate one_time_keys;
+
 pub mod device;
 pub mod olm;
 pub mod megolm;
 pub mod api;
-mod util;
 
 #[cfg(test)]
 mod tests {}
