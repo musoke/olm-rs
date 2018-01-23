@@ -38,6 +38,11 @@ applies a HKDF with a different info (`OLM_ROOT` instead of `OLM_RATCHET`).
     `ring` does not yet have AES-CBC with HMAC-SHA256, so I've cobbled it
     together from `rust-crypto`, likely not very well.
 
+  - Better errors.
+    Currently using [failure](https://boats.gitlab.io/failure/), but not very well.
+    There are a lot of `.unwraps()`.
+
+
 # Warning
 
 __I am not a cryptographer.  Assume I know nothing about cryptography.

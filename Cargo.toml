@@ -6,7 +6,7 @@ version = "0.0.1"
 [dependencies]
 base64 = "0.6.0"
 env_logger = "0.4.3"
-error-chain = "0.10.0"
+failure = "0.1.1"
 log = "0.3.8"
 rand = "0.3.16"
 ring = "0.9.7"

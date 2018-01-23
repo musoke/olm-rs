@@ -2,10 +2,19 @@ use ring;
 use ring::signature;
 use untrusted;
 use util;
-use olm::errors::*;
 use ruma_signatures::{KeyPair, Signature};
 use ruma_signatures::Error as RumaSignaturesError;
-use core::result::Result as CoreResult;
+
+#[derive(Fail, Debug)]
+pub enum SigningKeyError {
+    #[fail(display = "Unable to generate key")] GenerationError,
+    #[fail(display = "Unable to export key")] ExportError,
+    #[fail(display = "Unable to import key")] ImportError,
+}
+
+#[derive(Fail, Debug)]
+#[fail(display = "signature could not be verified")]
+pub struct SignatureVerificationError {}
 
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
 // should "inherit" the `SigningKey` and `SigningKeyPair` traits from the members.
@@ -33,7 +42,7 @@ pub trait SigningKey {
 
     /// Verify a signature
     ///
-    fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<()>;
+    fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<(), SignatureVerificationError>;
 
     // /// Version
     // fn version(&self);
@@ -57,13 +66,13 @@ impl SigningKey for Ed25519Pub {
         untrusted::Input::from(&self.pub_key)
     }
 
-    fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<()> {
+    fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<(), SignatureVerificationError> {
         Ok(signature::verify(
             &signature::ED25519,
             self.public_key(),
             untrusted::Input::from(msg),
             untrusted::Input::from(sig),
-        )?)
+        ).map_err(|_| SignatureVerificationError {})?)
     }
 }
 
@@ -121,17 +130,18 @@ impl Ed25519Pair {
     /// Create new signing key
     ///
     /// Should only be exposed via `LocalDevice::new()`?
-    pub fn generate() -> Result<Self> {
+    pub fn generate() -> Result<Self, SigningKeyError> {
         // TODO share one rng among all of lib
         let rng = ring::rand::SystemRandom::new();
 
         // Generate a new signing key
         let pkcs8_bytes = signature::Ed25519KeyPair::generate_pkcs8(&rng)
-            .chain_err(|| "Unable to generate signature key")?;
+            .map_err(|_| SigningKeyError::GenerationError)?;
         // TODO Normally the application would store the PKCS#8 file persistently. Later it would
         // read the PKCS#8 file from persistent storage to use it.
-        let signing_key_pair =
-            signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(&pkcs8_bytes))?;
+        let signing_key_pair = signature::Ed25519KeyPair::from_pkcs8(untrusted::Input::from(
+            &pkcs8_bytes,
+        )).map_err(|_| SigningKeyError::GenerationError)?;
 
         Ok(Ed25519Pair {
             pkcs8: Some(pkcs8_bytes),
@@ -142,21 +152,21 @@ impl Ed25519Pair {
     /// Create signing key from btyes
     ///
     /// Should only be exposed via `LocalDevice::new()`?
-    pub fn from_pkcs8(input: untrusted::Input) -> Result<Self> {
+    pub fn from_pkcs8(input: untrusted::Input) -> Result<Self, SigningKeyError> {
         let mut pkcs8 = [0u8; 85];
         pkcs8.clone_from_slice(input.as_slice_less_safe());
 
         Ok(Ed25519Pair {
             pkcs8: Some(pkcs8),
             pair: signature::Ed25519KeyPair::from_pkcs8(input)
-                .chain_err(|| "Failed to load private key")?,
+                .map_err(|_| SigningKeyError::ImportError)?,
         })
     }
 
-    pub fn try_to_pkcs8_bytes(&self) -> Result<&[u8]> {
+    pub fn try_to_pkcs8_bytes(&self) -> Result<&[u8], SigningKeyError> {
         match self.pkcs8 {
             Some(ref a) => Ok(a),
-            _ => Err(Error::from("could not export private signing key")),
+            _ => Err(SigningKeyError::ExportError),
         }
     }
 }
@@ -166,13 +176,13 @@ impl SigningKey for Ed25519Pair {
         untrusted::Input::from(self.pair.public_key_bytes())
     }
 
-    fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<()> {
+    fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<(), SignatureVerificationError> {
         Ok(signature::verify(
             &signature::ED25519,
             self.public_key(),
             untrusted::Input::from(msg),
             untrusted::Input::from(sig),
-        )?)
+        ).map_err(|_| SignatureVerificationError {})?)
     }
 }
 
@@ -187,7 +197,7 @@ impl KeyPair for Ed25519Pair {
         public_key: &[u8],
         private_key: &[u8],
         version: String,
-    ) -> CoreResult<Self, RumaSignaturesError> {
+    ) -> Result<Self, RumaSignaturesError> {
         unimplemented!()
     }
 

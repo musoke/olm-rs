@@ -2,10 +2,17 @@ use ring;
 use ring::agreement;
 use untrusted;
 use util;
-use olm::errors::*;
 use std::collections::HashMap;
 use std::fmt;
 
+use core::result::Result as CoreResult;
+use failure::ResultExt;
+
+#[derive(Debug, Fail, Deserialize)]
+pub enum OneTimeKeyError {
+    #[fail(display = "could not generate key")] GenerationError,
+    #[fail(display = "agreement failed")] Agreement,
+}
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
 // should "inherit" the `OneTimeKey` and `OneTimeKeyPriv` traits from the members.
 
@@ -97,12 +104,12 @@ impl Curve25519Priv {
     /// Create new one-time key
     ///
     /// Should only be exposed via `LocalDevice::new()`?
-    pub fn generate() -> Result<Self> {
+    pub fn generate() -> CoreResult<Self, OneTimeKeyError> {
         unimplemented!()
     }
 
     /// This is a temporary hack
-    pub fn generate_unrandom() -> Result<Self> {
+    pub fn generate_unrandom() -> CoreResult<Self, OneTimeKeyError> {
         use rand;
         let seed = rand::random::<u8>();
 
@@ -111,7 +118,7 @@ impl Curve25519Priv {
 
         // Generate a new one-time key
         let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
-            .chain_err(|| "Unable to generate one-time key")?;
+            .map_err(|_| OneTimeKeyError::GenerationError)?;
 
         // Calculate corresponding public key
         let mut public_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
@@ -133,7 +140,7 @@ impl Curve25519Priv {
     ///
     /// Currently unimplemented; ring only has ephemeral keys
     /// https://github.com/briansmith/ring/issues/331
-    pub fn from_pkcs8(_input: untrusted::Input) -> Result<Self> {
+    pub fn from_pkcs8(_input: untrusted::Input) -> Result<Self, OneTimeKeyError> {
         unimplemented!();
     }
 }
@@ -145,7 +152,6 @@ impl OneTimeKeyPriv for Curve25519Priv {
         let rng = ring::test::rand::FixedByteRandom { byte: self.seed };
         // Generate that same new one-time key
         let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
-            .chain_err(|| "Unable to generate one-time key")
             .expect(
                 "This call to agreement::EpemeralPrivateKey::generate will not be in final version",
             );
@@ -171,7 +177,7 @@ impl Store {
     /// ```
     /// let s = olm::olm::one_time_key::Store::generate().expect("Can generate onetime key store");
     /// ```
-    pub fn generate() -> Result<Self> {
+    pub fn generate() -> CoreResult<Self, OneTimeKeyError> {
         let mut store = Store {
             hashmap: HashMap::with_capacity(Self::DEFAULT_NUM_ONE_TIME_KEY_PAIRS),
         };
@@ -239,7 +245,7 @@ mod test {
             a.private_key(),
             &agreement::X25519,
             b_pub.public_key(),
-            Error::from("asdf"),
+            OneTimeKeyError::Agreement,
             |d| Ok(d.to_vec()),
         ).unwrap();
 
@@ -247,7 +253,7 @@ mod test {
             a.private_key(),
             &agreement::X25519,
             b_pub.public_key(),
-            Error::from("asdf"),
+            OneTimeKeyError::Agreement,
             |d| Ok(d.to_vec()),
         ).unwrap();
 

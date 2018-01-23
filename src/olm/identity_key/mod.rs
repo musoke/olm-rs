@@ -2,8 +2,14 @@ use ring;
 use ring::agreement;
 use untrusted;
 use util;
-use olm::errors::*;
 use std::fmt;
+
+#[derive(Fail, Debug)]
+pub enum OneTimeKeyError {
+    #[fail(display = "Unable to generate key")] GenerationError,
+    #[fail(display = "Unable to export key")] ExportError,
+    #[fail(display = "Unable to import key")] ImportError,
+}
 
 // TODO: create non-exhaustive enums encapsulating the different possible key types.  This enum
 // should "inherit" the `IdentityKey` and `IdentityKeyPriv` traits from the members.
@@ -87,12 +93,12 @@ impl Curve25519Priv {
     /// Create new identity key
     ///
     /// Should only be exposed via `LocalDevice::new()`?
-    pub fn generate() -> Result<Self> {
+    pub fn generate() -> Result<Self, OneTimeKeyError> {
         unimplemented!()
     }
 
     /// This is a temporary hack
-    pub fn generate_unrandom() -> Result<Self> {
+    pub fn generate_unrandom() -> Result<Self, OneTimeKeyError> {
         use rand;
         let seed = rand::random::<u8>();
 
@@ -101,7 +107,7 @@ impl Curve25519Priv {
 
         // Generate a new identity key
         let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
-            .chain_err(|| "Unable to generate identity key")?;
+            .map_err(|_| OneTimeKeyError::GenerationError)?;
 
         // Calculate corresponding public key
         let mut public_key = [0u8; agreement::PUBLIC_KEY_MAX_LEN];
@@ -123,7 +129,7 @@ impl Curve25519Priv {
     ///
     /// Currently unimplemented; ring only has ephemeral keys
     /// https://github.com/briansmith/ring/issues/331
-    pub fn from_pkcs8(_input: untrusted::Input) -> Result<Self> {
+    pub fn from_pkcs8(_input: untrusted::Input) -> Result<Self, OneTimeKeyError> {
         unimplemented!();
     }
 }
@@ -135,7 +141,6 @@ impl IdentityKeyPriv for Curve25519Priv {
         let rng = ring::test::rand::FixedByteRandom { byte: self.seed };
         // Generate that same new one-time key
         let private_key = agreement::EphemeralPrivateKey::generate(&agreement::X25519, &rng)
-            .chain_err(|| "Unable to generate one-time key")
             .expect(
                 "This call to agreement::EpemeralPrivateKey::generate will not be in final version",
             );

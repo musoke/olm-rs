@@ -2,13 +2,19 @@ use ring;
 use ring::agreement;
 use ring::{hkdf, hmac};
 use std::collections::HashMap;
-use olm::errors::*;
 use olm::{identity_key, one_time_key};
 use olm::one_time_key::{OneTimeKey, OneTimeKeyPriv};
 use olm::identity_key::{IdentityKey, IdentityKeyPriv};
 
 use crypto::buffer::{BufferResult, ReadBuffer, WriteBuffer};
 
+#[derive(Fail, Debug)]
+enum RatchetError {
+    #[fail(display = "too many unused message keys")] SkippedMessageOverflow,
+    #[fail(display = "unable to encrypt")] EncryptionError,
+    #[fail(display = "unable to decrypt")] DecryptionError,
+    #[fail(display = "initialization error")] InitializationError,
+}
 pub struct Store {
     hashmap: HashMap<RatchetId, Ratchet>,
 }
@@ -65,9 +71,8 @@ impl Ratchet {
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: &identity_key::Curve25519Pub,
         one_time_bob: one_time_key::Curve25519Pub,
-    ) -> Result<Self> {
-        let state = State::init_sending(ident_alice, one_time_alice, ident_bob, one_time_bob)
-            .chain_err(|| "Failed to initialize ratchet for sending")?;
+    ) -> Result<Self, RatchetError> {
+        let state = State::init_sending(ident_alice, one_time_alice, ident_bob, one_time_bob)?;
 
         Ok(Ratchet {
             id: RatchetId {},
@@ -85,10 +90,9 @@ impl Ratchet {
         one_time_alice: one_time_key::Curve25519Pub,
         header: MessageHeader,
         ciphertext: &Vec<u8>,
-    ) -> Result<Self> {
+    ) -> Result<Self, RatchetError> {
         let state =
-            State::init_receiving(ident_bob, one_time_bob, ident_alice, one_time_alice, header)
-                .chain_err(|| "Failed to initialize ratchet for receiving")?;
+            State::init_receiving(ident_bob, one_time_bob, ident_alice, one_time_alice, header)?;
 
         // TODO: Check if decryptable and authentication is correct? If so, should discard the
         // one-time key in the calling function
@@ -101,13 +105,20 @@ impl Ratchet {
         })
     }
 
-    pub fn encrypt(&mut self, plaintext: &Vec<u8>) -> Result<(MessageHeader, Vec<u8>)> {
+    pub fn encrypt(
+        &mut self,
+        plaintext: &Vec<u8>,
+    ) -> Result<(MessageHeader, Vec<u8>), RatchetError> {
         let (header, ciphertext) = self.state.state_encrypt(plaintext)?;
 
         Ok((header, ciphertext))
     }
 
-    pub fn decrypt(&mut self, header: MessageHeader, ciphertext: &Vec<u8>) -> Result<Vec<u8>> {
+    pub fn decrypt(
+        &mut self,
+        header: MessageHeader,
+        ciphertext: &Vec<u8>,
+    ) -> Result<Vec<u8>, RatchetError> {
         let plaintext = self.state.state_decrypt(header, ciphertext)?;
 
         Ok(plaintext)
@@ -126,14 +137,15 @@ impl State {
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_bob: &identity_key::Curve25519Pub,
         one_time_bob: one_time_key::Curve25519Pub,
-    ) -> Result<Self> {
+    ) -> Result<Self, RatchetError> {
         let mut state: State = Default::default();
 
-        let dh_self_priv = one_time_key::Curve25519Priv::generate_unrandom()?;
+        let dh_self_priv = one_time_key::Curve25519Priv::generate_unrandom()
+            .map_err(|_| RatchetError::InitializationError)?;
         state.dh_self = Some(dh_self_priv);
 
-        let shared_secret =
-            State::x3dh_local(ident_alice, one_time_alice, ident_bob, one_time_bob)?;
+        let shared_secret = State::x3dh_local(ident_alice, one_time_alice, ident_bob, one_time_bob)
+            .map_err(|_| RatchetError::InitializationError)?;
         let (root, chain) = State::kdf_rk_init(shared_secret);
 
         state.root_key = root;
@@ -149,11 +161,12 @@ impl State {
         ident_alice: &identity_key::Curve25519Pub,
         one_time_alice: one_time_key::Curve25519Pub,
         header: MessageHeader,
-    ) -> Result<Self> {
+    ) -> Result<Self, RatchetError> {
         let mut state: State = Default::default();
 
         let shared_secret =
-            State::x3dh_remote(ident_bob, one_time_bob, ident_alice, one_time_alice)?;
+            State::x3dh_remote(ident_bob, one_time_bob, ident_alice, one_time_alice)
+                .map_err(|_| RatchetError::InitializationError)?;
         let (root, chain) = State::kdf_rk_init(shared_secret);
 
         state.root_key = root;
@@ -163,10 +176,11 @@ impl State {
         state.dh_remote = Some(header.dh_key);
 
         // Create local DH key
-        state.dh_self = Some(one_time_key::Curve25519Priv::generate_unrandom()?);
+        state.dh_self = Some(one_time_key::Curve25519Priv::generate_unrandom()
+            .map_err(|_| RatchetError::InitializationError)?);
 
         // Ratchet to get sending chain
-        let dh_out = state.ecdh()?;
+        let dh_out = state.ecdh().map_err(|_| RatchetError::InitializationError)?;
         let (rk, cks) = State::kdf_rk(state.root_key, dh_out);
         state.root_key = rk;
         state.chain_key_sending = Some(cks);
@@ -180,7 +194,7 @@ impl State {
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_remote: &identity_key::Curve25519Pub,
         one_time_remote: one_time_key::Curve25519Pub,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Vec<u8>, RatchetError> {
         // TODO: change once non-ephemeral keys are available
 
         let mut secret_1 = agreement::agree_ephemeral(
@@ -189,7 +203,7 @@ impl State {
             one_time_remote.public_key(),
             ring::error::Unspecified,
             |s| Ok(s.to_vec()),
-        ).chain_err(|| "Agreement error")?;
+        ).unwrap();
 
         let mut secret_2 = agreement::agree_ephemeral(
             one_time_local.private_key(),
@@ -197,7 +211,7 @@ impl State {
             ident_remote.public_key(),
             ring::error::Unspecified,
             |s| Ok(s.to_vec()),
-        ).chain_err(|| "Agreement error")?;
+        ).unwrap();
 
         let mut secret_3 = agreement::agree_ephemeral(
             one_time_local.private_key(),
@@ -205,7 +219,7 @@ impl State {
             one_time_remote.public_key(),
             ring::error::Unspecified,
             |s| Ok(s.to_vec()),
-        ).chain_err(|| "Agreement error")?;
+        ).unwrap();
 
         let mut s = Vec::new();
         s.append(&mut secret_1);
@@ -221,7 +235,7 @@ impl State {
         // TODO: ident_bob should not be consumed once it is non-ephemeral
         ident_remote: &identity_key::Curve25519Pub,
         one_time_remote: one_time_key::Curve25519Pub,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Vec<u8>, RatchetError> {
         // TODO: change once non-ephemeral keys are available
 
         let mut secret_1 = agreement::agree_ephemeral(
@@ -230,7 +244,7 @@ impl State {
             ident_remote.public_key(),
             ring::error::Unspecified,
             |s| Ok(s.to_vec()),
-        ).chain_err(|| "Agreement error")?;
+        ).unwrap();
 
         let mut secret_2 = agreement::agree_ephemeral(
             ident_local.private_key(),
@@ -238,7 +252,7 @@ impl State {
             one_time_remote.public_key(),
             ring::error::Unspecified,
             |s| Ok(s.to_vec()),
-        ).chain_err(|| "Agreement error")?;
+        ).unwrap();
 
         let mut secret_3 = agreement::agree_ephemeral(
             one_time_local.private_key(),
@@ -246,7 +260,7 @@ impl State {
             one_time_remote.public_key(),
             ring::error::Unspecified,
             |s| Ok(s.to_vec()),
-        ).chain_err(|| "Agreement error")?;
+        ).unwrap();
 
         let mut s = Vec::new();
         s.append(&mut secret_1);
@@ -278,7 +292,7 @@ impl State {
         (root, chain)
     }
 
-    fn dh_ratchet(&mut self, header: &MessageHeader) -> Result<()> {
+    fn dh_ratchet(&mut self, header: &MessageHeader) -> Result<(), RatchetError> {
         self.n_previous = self.n_sending;
         self.n_sending = 0;
         self.n_receive = 0;
@@ -286,16 +300,16 @@ impl State {
         self.dh_remote = Some(header.dh_key.clone());
 
         // Ratchet to get new receiving chain
-        let dh_out = self.ecdh()?;
+        let dh_out = self.ecdh().unwrap();
         let (rk, ckr) = State::kdf_rk(self.root_key, dh_out);
         self.root_key = rk;
         self.chain_key_receive = Some(ckr);
 
         // Generate new DH key
-        self.dh_self = Some(one_time_key::Curve25519Priv::generate_unrandom()?);
+        self.dh_self = Some(one_time_key::Curve25519Priv::generate_unrandom().unwrap());
 
         // Ratchet to get new sending chain
-        let dh_out = self.ecdh()?;
+        let dh_out = self.ecdh().unwrap();
         let (rk, cks) = State::kdf_rk(self.root_key, dh_out);
         self.root_key = rk;
         self.chain_key_sending = Some(cks);
@@ -321,7 +335,7 @@ impl State {
         (root, chain)
     }
 
-    fn ecdh(&mut self) -> Result<Vec<u8>> {
+    fn ecdh(&mut self) -> Result<Vec<u8>, RatchetError> {
         // Take the DH keys so that can use them
         let dh_self = self.dh_self
             .take()
@@ -336,7 +350,7 @@ impl State {
             dh_remote.public_key(),
             ring::error::Unspecified,
             |s| Ok(s.to_vec()),
-        ).chain_err(|| "ECDH agreement error")?;
+        ).unwrap();
 
         // Replace the original DH keys
         // FIXME There must be a better way to do this
@@ -346,7 +360,10 @@ impl State {
         Ok(secret)
     }
 
-    pub fn state_encrypt(&mut self, plaintext: &Vec<u8>) -> Result<(MessageHeader, Vec<u8>)> {
+    pub fn state_encrypt(
+        &mut self,
+        plaintext: &Vec<u8>,
+    ) -> Result<(MessageHeader, Vec<u8>), RatchetError> {
         let n_sending = self.n_sending;
 
         let (ck, mk) = State::kdf_ck(self.chain_key_sending.expect("Should have a sending chain"));
@@ -383,7 +400,7 @@ impl State {
         &mut self,
         header: MessageHeader,
         ciphertext: &Vec<u8>,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Vec<u8>, RatchetError> {
         match self.try_skipped_message_keys(&header, &ciphertext)? {
             Some(plaintext) => {
                 debug!("Matched skipped message key");
@@ -412,7 +429,7 @@ impl State {
                 self.chain_key_receive = Some(ckr);
                 self.n_receive += 1;
 
-                State::decrypt_and_auth(mk, &ciphertext).chain_err(|| "Failed to decrypt message")
+                State::decrypt_and_auth(mk, &ciphertext).map_err(|_| panic!())
             }
         }
     }
@@ -421,7 +438,7 @@ impl State {
         &mut self,
         header: &MessageHeader,
         ciphertext: &Vec<u8>,
-    ) -> Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Vec<u8>>, RatchetError> {
         debug!("Trying skipped message keys");
 
         debug!("mk_skipped: {:?}", self.mk_skipped.keys());
@@ -431,22 +448,20 @@ impl State {
         // confirm.
         // TODO is there a way around cloning dh_key?
         if let Some(mk) = self.mk_skipped.remove(&(header.dh_key.clone(), header.n)) {
-            Ok(Some(State::decrypt_and_auth(mk, ciphertext).chain_err(
-                || "Failed to decrypt skipped message; key deleted",
-            )?))
+            Ok(Some(State::decrypt_and_auth(mk, ciphertext).unwrap()))
         } else {
             Ok(None)
         }
     }
 
-    fn skip_message_keys(&mut self, until: usize) -> Result<()> {
+    fn skip_message_keys(&mut self, until: usize) -> Result<(), RatchetError> {
         debug!(
             "Skipping message keys from {} up to {}",
             self.n_receive, until
         );
 
         if self.n_receive + State::MAX_SKIP < until {
-            Err(ErrorKind::SkippedMessageOverflow.into())
+            Err(RatchetError::SkippedMessageOverflow)
         } else if self.chain_key_receive.is_some() {
             while self.n_receive < until {
                 let (ck, mk) = State::kdf_ck(self.chain_key_receive.unwrap());
@@ -467,7 +482,11 @@ impl State {
         }
     }
 
-    fn encrypt(aes_key: [u8; 32], aes_iv: [u8; 16], plaintext: &Vec<u8>) -> Result<Vec<u8>> {
+    fn encrypt(
+        aes_key: [u8; 32],
+        aes_iv: [u8; 16],
+        plaintext: &Vec<u8>,
+    ) -> Result<Vec<u8>, RatchetError> {
         use crypto;
         use crypto::aes;
 
@@ -489,7 +508,7 @@ impl State {
         loop {
             let result = encryptor
                 .encrypt(&mut read_buffer, &mut write_buffer, true)
-                .map_err(|e| ErrorKind::EncryptionError(e))?;
+                .map_err(|_| RatchetError::EncryptionError)?;
 
             ciphertext.extend(
                 write_buffer
@@ -508,7 +527,7 @@ impl State {
         Ok(ciphertext)
     }
 
-    fn decrypt_and_auth(mk: [u8; 32], ciphertext: &Vec<u8>) -> Result<Vec<u8>> {
+    fn decrypt_and_auth(mk: [u8; 32], ciphertext: &Vec<u8>) -> Result<Vec<u8>, RatchetError> {
         let (aes_key, hmac_key, aes_iv) = State::derive_aead_keys(mk);
 
         // FIXME: HMAC auth
@@ -518,7 +537,11 @@ impl State {
         Ok(plaintext)
     }
 
-    fn decrypt(aes_key: [u8; 32], aes_iv: [u8; 16], ciphertext: &Vec<u8>) -> Result<Vec<u8>> {
+    fn decrypt(
+        aes_key: [u8; 32],
+        aes_iv: [u8; 16],
+        ciphertext: &Vec<u8>,
+    ) -> Result<Vec<u8>, RatchetError> {
         debug!("aes_key: {:?}", aes_key);
         debug!("aes_iv: {:?}", aes_iv);
 
@@ -540,7 +563,7 @@ impl State {
         loop {
             let result = decryptor
                 .decrypt(&mut read_buffer, &mut write_buffer, true)
-                .map_err(|e| ErrorKind::DecryptionError(e))?;
+                .map_err(|_| RatchetError::EncryptionError)?;
 
             plaintext.extend(
                 write_buffer

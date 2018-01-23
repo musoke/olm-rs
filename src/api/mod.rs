@@ -1,4 +1,3 @@
-use errors::*;
 use device::{Device, LocalDevice};
 
 use ruma_identifiers::UserId;
@@ -7,6 +6,12 @@ use ruma_signatures::{SignatureSet, UserSignatures};
 use serde_json;
 
 use std::collections::HashMap;
+
+#[derive(Fail, Debug)]
+pub enum OlmApiError {
+    #[fail(display = "generic olm api error")] Error,
+    #[fail(display = "device generation failed")] DeviceGeneration,
+}
 
 impl LocalDevice {
     /// Create a new device for the given user
@@ -29,8 +34,8 @@ impl LocalDevice {
     ///     );
     /// }
     /// ```
-    pub fn olm_create_account(user_id: UserId) -> Result<Self> {
-        let device = LocalDevice::init(user_id).chain_err(|| "Failed to create device")?;
+    pub fn olm_create_account(user_id: UserId) -> Result<Self, OlmApiError> {
+        let device = LocalDevice::init(user_id).map_err(|_| OlmApiError::DeviceGeneration)?;
 
         Ok(device)
     }
@@ -65,10 +70,7 @@ impl LocalDevice {
 
         let mut signature_set = SignatureSet::new();
         // TODO: handle errors
-        signature_set.insert(
-            self.sign_json(&serde_json::to_value(&device_keys).unwrap())
-                .unwrap(),
-        );
+        signature_set.insert(self.sign_json(&serde_json::to_value(&device_keys).unwrap()));
         device_keys
             .signatures
             .insert(&self.user_id().to_string(), signature_set);

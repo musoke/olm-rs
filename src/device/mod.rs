@@ -1,7 +1,6 @@
 use std::fmt;
 use untrusted;
 use util;
-use errors::*;
 use olm::{identity_key, one_time_key, ratchet, signing_key};
 use olm::signing_key::SigningKey;
 use serde_json::value::Value;
@@ -9,6 +8,11 @@ use ruma_signatures;
 use ruma_signatures::Signature;
 
 use ruma_identifiers::UserId;
+
+#[derive(Fail, Debug)]
+pub enum DeviceError {
+    #[fail(display = "failed to create key")] KeyGenerationError,
+}
 
 #[derive(Debug, Clone)]
 pub struct DeviceId {
@@ -83,7 +87,7 @@ impl LocalDevice {
     ///     let my_dev = olm::device::LocalDevice::init(user_id);
     /// }
     /// ```
-    pub fn init(user_id: UserId) -> Result<Self> {
+    pub fn init(user_id: UserId) -> Result<Self, DeviceError> {
         use rand::Rng;
 
         // TODO: Should the device_id be cryptographically random?
@@ -97,9 +101,12 @@ impl LocalDevice {
         Ok(LocalDevice {
             user_id: user_id,
             device_id: device_id,
-            signing_key_pair: signing_key::Ed25519Pair::generate()?,
-            ident_key_priv: identity_key::Curve25519Priv::generate_unrandom()?,
-            one_time_key_pairs: one_time_key::Store::generate()?,
+            signing_key_pair: signing_key::Ed25519Pair::generate()
+                .map_err(|_| DeviceError::KeyGenerationError)?,
+            ident_key_priv: identity_key::Curve25519Priv::generate_unrandom()
+                .map_err(|_| DeviceError::KeyGenerationError)?,
+            one_time_key_pairs: one_time_key::Store::generate()
+                .map_err(|_| DeviceError::KeyGenerationError)?,
             ratchets: ratchet::Store::new(),
         })
     }
@@ -132,9 +139,9 @@ impl LocalDevice {
     }
 
     /// Sign some json object
-    pub fn sign_json(&self, value: &Value) -> Result<Signature> {
+    pub fn sign_json(&self, value: &Value) -> Signature {
         // TODO: handle errors
-        Ok(ruma_signatures::sign_json(&self.signing_key_pair, value).unwrap())
+        ruma_signatures::sign_json(&self.signing_key_pair, value).unwrap()
     }
 }
 

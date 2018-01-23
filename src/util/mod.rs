@@ -1,4 +1,3 @@
-use errors::*;
 use base64;
 
 pub fn bin_to_base64<T>(i: &T) -> String
@@ -19,7 +18,11 @@ where
     base64::encode_config(i, config)
 }
 
-pub fn base64_to_bin<S>(i: &S) -> Result<Vec<u8>>
+#[derive(Fail, Debug)]
+#[fail(display = "base64 could not be decoded")]
+pub struct Base64DecodeError {}
+
+pub fn base64_to_bin<S>(i: &S) -> Result<Vec<u8>, Base64DecodeError>
 where
     S: ?Sized + AsRef<[u8]>,
 {
@@ -30,7 +33,7 @@ where
         base64::LineWrap::NoWrap,
     );
 
-    Ok(base64::decode_config(&i, config).chain_err(|| "failed to decode base64")?)
+    Ok(base64::decode_config(&i, config).map_err(|_| Base64DecodeError {})?)
 }
 
 #[cfg(test)]
