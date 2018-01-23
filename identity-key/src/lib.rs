@@ -1,7 +1,15 @@
-use ring;
+#[macro_use]
+extern crate failure;
+extern crate olm_util as util;
+extern crate rand;
+extern crate ring;
+extern crate untrusted;
+
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+
 use ring::agreement;
-use untrusted;
-use util;
 use std::fmt;
 
 #[derive(Fail, Debug)]

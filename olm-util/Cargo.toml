@@ -1,0 +1,8 @@
+[package]
+name = "olm-util"
+version = "0.1.0"
+authors = ["Nathan Musoke <nathan.musoke@gmail.com>"]
+
+[dependencies]
+base64 = "0.6.0"
+failure = "0.1.1"

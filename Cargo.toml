@@ -16,6 +16,18 @@ serde_derive = "1.0.9"
 serde_json = "1.0.9"
 untrusted = "0.5.1"
 
+[dependencies.one-time-keys]
+path = "one-time-keys"
+
+[dependencies.identity-key]
+path = "identity-key"
+
+[dependencies.signing-key]
+path = "signing-key"
+
+[dependencies.olm-util]
+path = "olm-util"
+
 [dependencies.ruma-client-api]
 branch = "unstable-e2e"
 git = "https://github.com/musoke/ruma-client-api"
@@ -42,3 +54,5 @@ git = "https://github.com/musoke/ruma-client"
 [dev-dependencies.ruma-events]
 branch = "synapse-workarounds"
 git = "https://github.com/jplatte/ruma-events"
+
+[workspace]
