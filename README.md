@@ -42,6 +42,8 @@ applies a HKDF with a different info (`OLM_ROOT` instead of `OLM_RATCHET`).
     Currently using [failure](https://boats.gitlab.io/failure/), but not very well.
     There are a lot of `.unwraps()`.
 
+  - Use `ruma-signatures` directly to sign json, etc.
+
 
 # Warning
 
