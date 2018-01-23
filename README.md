@@ -21,6 +21,16 @@ Initialization of ratchets: Double Ratchet applies the same `KDF_RK` to the
 shared secret as when advancing the root key under normal operation. Olm
 applies a HKDF with a different info (`OLM_ROOT` instead of `OLM_RATCHET`).
 
+## Running the examples
+
+If you want to test locally, there is a [Docker synapse](https://hub.docker.com/r/silviof/docker-matrix/). 
+Set it up with the instructions there, then enable guest access.
+Then
+```
+docker run -d -p 8448:8448 -p 8008:8008 -p 3478:3478 -v /tmp/data:/data avhost/docker-matrix start
+cargo run --example upload_keys http://localhost:8008 \#room:localhost
+```
+
 ## Todo
 
   - Better one-time keys: `ring` currently only has ephemeral Diffie-Hellman keys.
