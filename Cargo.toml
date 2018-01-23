@@ -19,6 +19,9 @@ untrusted = "0.5.1"
 [dependencies.one-time-keys]
 path = "one-time-keys"
 
+[dependencies.identity-key]
+path = "identity-key"
+
 [dependencies.olm-util]
 path = "olm-util"
 

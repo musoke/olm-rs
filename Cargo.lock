@@ -265,6 +265,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "identity-key"
+version = "0.1.0"
+dependencies = [
+ "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "olm-util 0.1.0",
+ "rand 0.3.20 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ring 0.9.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "untrusted 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "idna"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -435,6 +448,7 @@ dependencies = [
  "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-await 0.1.0 (git+https://github.com/alexcrichton/futures-await)",
+ "identity-key 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "olm-util 0.1.0",
  "one-time-keys 0.1.0",

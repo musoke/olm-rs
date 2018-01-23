@@ -10,5 +10,4 @@
 // }
 
 pub mod signing_key;
-pub mod identity_key;
 pub mod ratchet;

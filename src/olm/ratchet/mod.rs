@@ -2,10 +2,10 @@ use ring;
 use ring::agreement;
 use ring::{hkdf, hmac};
 use std::collections::HashMap;
-use olm::identity_key;
+use identity_key;
 use one_time_keys;
 use one_time_keys::{OneTimeKey, OneTimeKeyPriv};
-use olm::identity_key::{IdentityKey, IdentityKeyPriv};
+use identity_key::{IdentityKey, IdentityKeyPriv};
 
 use crypto::buffer::{BufferResult, ReadBuffer, WriteBuffer};
 
@@ -654,8 +654,8 @@ impl Ratchet {
 mod test {
 
     use one_time_keys;
-    use olm::identity_key;
-    use olm::identity_key::{IdentityKey, IdentityKeyPriv};
+    use identity_key;
+    use identity_key::{IdentityKey, IdentityKeyPriv};
     use one_time_keys::{OneTimeKey, OneTimeKeyPriv};
     use olm::ratchet::Ratchet;
 
