@@ -1,6 +1,16 @@
-use ring;
+#[macro_use]
+extern crate failure;
+extern crate olm_util;
+extern crate rand;
+extern crate ring;
+extern crate ruma_signatures;
+extern crate untrusted;
+
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+
 use ring::signature;
-use untrusted;
 use olm_util as util;
 use ruma_signatures::{KeyPair, Signature};
 use ruma_signatures::Error as RumaSignaturesError;

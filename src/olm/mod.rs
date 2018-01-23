@@ -9,5 +9,4 @@
 //     #[fail(display = "skipped message overflow")] SkippedMessageOverflow,
 // }
 
-pub mod signing_key;
 pub mod ratchet;

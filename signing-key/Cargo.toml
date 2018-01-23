@@ -1,0 +1,20 @@
+[package]
+name = "signing-key"
+version = "0.1.0"
+authors = ["Nathan Musoke <nathan.musoke@gmail.com>"]
+
+[dependencies]
+failure = "0.1.1"
+ring = "0.9.7"
+untrusted = "0.5.1"
+rand = "0.3.16"
+serde = "1.0.9"
+serde_derive = "1.0.9"
+
+[dependencies.olm-util]
+path = "../olm-util"
+
+[dependencies.ruma-signatures]
+branch = "unstable-e2e"
+git = "https://github.com/musoke/ruma-signatures"
+

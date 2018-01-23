@@ -22,6 +22,9 @@ path = "one-time-keys"
 [dependencies.identity-key]
 path = "identity-key"
 
+[dependencies.signing-key]
+path = "signing-key"
+
 [dependencies.olm-util]
 path = "olm-util"
 
