@@ -28,6 +28,9 @@ path = "signing-key"
 [dependencies.olm-util]
 path = "olm-util"
 
+[dependencies.e2e-types]
+path = "e2e-types"
+
 [dependencies.ruma-client-api]
 branch = "unstable-e2e"
 git = "https://github.com/musoke/ruma-client-api"

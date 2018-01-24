@@ -1,0 +1,3 @@
+[submodule "e2e-types"]
+	path = e2e-types
+	url = git@github.com:musoke/e2e-types.git
