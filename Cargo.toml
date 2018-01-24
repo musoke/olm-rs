@@ -18,30 +18,38 @@ untrusted = "0.5.1"
 
 [dependencies.one-time-keys]
 path = "one-time-keys"
+version = "0.1.0"
 
 [dependencies.identity-key]
 path = "identity-key"
+version = "0.1.0"
 
 [dependencies.signing-key]
 path = "signing-key"
+version = "0.1.0"
 
 [dependencies.olm-util]
 path = "olm-util"
+version = "0.1.0"
 
 [dependencies.e2e-types]
 path = "e2e-types"
+version = "0.1.0"
 
 [dependencies.ruma-client-api]
 branch = "unstable-e2e"
 git = "https://github.com/musoke/ruma-client-api"
+version = "0.1.0"
 
 [dependencies.ruma-identifiers]
 branch = "synapse-workarounds"
 git = "https://github.com/jplatte/ruma-identifiers"
+version = "0.11.0"
 
 [dependencies.ruma-signatures]
 branch = "unstable-e2e"
 git = "https://github.com/musoke/ruma-signatures"
+version = "0.4.0"
 
 [dev-dependencies]
 tokio-core = "0.1.8"
