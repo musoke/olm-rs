@@ -56,15 +56,7 @@ impl LocalDevice {
     /// }
     /// ```
     pub fn init(user_id: UserId) -> Result<Self, DeviceError> {
-        use rand::Rng;
-
-        // TODO: Should the device_id be cryptographically random?
-        let device_id = DeviceId::from(
-            ::rand::thread_rng()
-                .gen_ascii_chars()
-                .take(10)
-                .collect::<String>(),
-        );
+        let device_id = DeviceId::new();
 
         Ok(LocalDevice {
             user_id: user_id,

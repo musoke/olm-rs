@@ -12,7 +12,6 @@ extern crate log;
 
 extern crate base64;
 extern crate crypto;
-extern crate rand;
 extern crate ring;
 extern crate untrusted;
 

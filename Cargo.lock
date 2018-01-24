@@ -121,6 +121,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "e2e-types"
 version = "0.1.0"
+dependencies = [
+ "rand 0.3.20 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "either"
@@ -457,7 +460,6 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "olm-util 0.1.0",
  "one-time-keys 0.1.0",
- "rand 0.3.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "ring 0.9.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruma-client 0.1.0 (git+https://github.com/musoke/ruma-client?branch=unstable-e2e)",
  "ruma-client-api 0.1.0 (git+https://github.com/musoke/ruma-client-api?branch=unstable-e2e)",
