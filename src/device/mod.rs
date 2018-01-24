@@ -1,4 +1,3 @@
-use std::fmt;
 use untrusted;
 use olm_util as util;
 use one_time_keys;
