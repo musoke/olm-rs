@@ -32,7 +32,7 @@ path = "olm-util"
 version = "0.1.0"
 
 [dependencies.e2e-types]
-path = "e2e-types"
+git = "https://github.com/musoke/e2e-types"
 version = "0.1.0"
 
 [dependencies.ruma-client-api]

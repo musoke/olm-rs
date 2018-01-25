@@ -60,7 +60,7 @@ impl LocalDevice {
 
         let mut device_keys = DeviceKeys {
             user_id: self.user_id(),
-            device_id: self.device_id().to_string(),
+            device_id: self.device_id(),
             // TODO: other algorithms
             algorithms: vec!["m.olm.curve25519-aes-sha256".to_string()],
             keys: keys,
