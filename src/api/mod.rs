@@ -43,8 +43,6 @@ impl LocalDevice {
     /// Get object containing identity keys
     ///
     /// Unlike reference olm, this is immediately ready to be used in a request.
-    ///
-    /// Unimplemented: sign the object
     pub fn olm_acount_identity_keys(&self) -> DeviceKeys {
         let mut keys = HashMap::new();
 
